@@ -8,10 +8,20 @@ module Custos
     class ModelGenerator < Rails::Generators::Base
       include ActiveRecord::Generators::Migration
 
+      KNOWN_PLUGINS = %w[password magic_link api_tokens mfa lockout email_confirmation remember_me].freeze
+
       source_root File.expand_path('templates', __dir__)
 
       argument :model_name, type: :string, desc: 'Model name (e.g. User)'
       argument :plugins, type: :array, default: [], banner: 'plugin1 plugin2'
+
+      def validate_plugins
+        unknown = plugins.map(&:to_s) - KNOWN_PLUGINS
+        return if unknown.empty?
+
+        raise Thor::Error, "Unknown plugin(s): #{unknown.join(', ')}. " \
+                           "Available: #{KNOWN_PLUGINS.join(', ')}"
+      end
 
       def create_column_migration
         columns = column_plugins & plugins.map(&:to_s)
@@ -52,7 +62,11 @@ module Custos
       private
 
       def table_name
-        model_name.underscore.pluralize
+        model_name.underscore.tr('/', '_').pluralize
+      end
+
+      def migration_class_suffix
+        model_name.camelize.delete(':').pluralize
       end
 
       def column_plugins

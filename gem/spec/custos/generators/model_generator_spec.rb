@@ -139,4 +139,21 @@ RSpec.describe Custos::Generators::ModelGenerator do
       expect(content).to include(':admin_users')
     end
   end
+
+  context 'with namespaced model' do
+    before { run_generator(%w[Admin::User password]) }
+
+    it 'converts namespace to underscored table name' do
+      content = File.read(migration_for('add_custos_to_admin_users'))
+
+      expect(content).to include('class AddCustosToAdminUsers')
+      expect(content).to include(':admin_users')
+    end
+  end
+
+  context 'with unknown plugin' do
+    it 'raises an error listing available plugins' do
+      expect { run_generator(%w[User pasword]) }.to raise_error(Thor::Error, /Unknown plugin.*pasword/)
+    end
+  end
 end

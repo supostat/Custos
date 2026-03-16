@@ -35,6 +35,9 @@ module Custos
   class UnknownPluginError < Error; end
   class NotAuthenticatedError < Error; end
   class DecryptionError < Error; end
+  class TokenExpiredError < Error; end
+  class TokenInvalidError < Error; end
+  class AccountLockedError < Error; end
 
   @mutex = Mutex.new
 

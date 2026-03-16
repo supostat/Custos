@@ -24,7 +24,7 @@ module Custos
       secret = Custos.configuration.token_secret
       return secret if secret
 
-      if defined?(Rails) && Rails.application.respond_to?(:secret_key_base)
+      if defined?(Rails) && Rails.respond_to?(:application) && Rails.application
         base = Rails.application.secret_key_base
         return base if base.present?
       end

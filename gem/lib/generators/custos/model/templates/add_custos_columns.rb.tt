@@ -1,4 +1,4 @@
-class AddCustosTo<%= model_name.camelize.pluralize %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+class AddCustosTo<%= migration_class_suffix %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
   def change
 <%- if has_password? -%>
     add_column :<%= table_name %>, :password_digest, :string
