@@ -36,13 +36,16 @@ This creates the `custos_magic_links` table.
 
 ```ruby
 custos do
-  plugin :magic_link, expiry: 10 * 60  # 10 minutes
+  plugin :magic_link,
+    expiry: 10 * 60,   # 10 minutes
+    cooldown: 120       # 2 minutes between requests
 end
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `expiry` | `Integer` | `900` (15 min) | Token lifetime in seconds |
+| `cooldown` | `Integer` | `60` (1 min) | Minimum interval between magic link requests per user (in seconds). Set to `0` to disable |
 
 ## Class Methods
 
@@ -131,3 +134,4 @@ end
 - Tokens are single-use: once verified, they are marked as used and cannot be reused
 - Default expiry is 15 minutes
 - The `generate_magic_link` method returns `nil` for nonexistent emails, but the controller should always show a generic success message to prevent email enumeration
+- Built-in cooldown (default: 60 seconds) prevents email bombing attacks

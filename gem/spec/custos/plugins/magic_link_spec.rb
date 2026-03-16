@@ -18,6 +18,11 @@ RSpec.describe Custos::Plugins::MagicLink do
         .to change(Custos::MagicLinkToken, :count).by(1)
     end
 
+    it 'returns nil during cooldown period' do
+      TestUser.generate_magic_link('magic@example.com')
+      expect(TestUser.generate_magic_link('magic@example.com')).to be_nil
+    end
+
     it 'fires magic_link_created callback' do
       callback_args = nil
       TestUser.custos_config.on(:magic_link_created) { |*args| callback_args = args }

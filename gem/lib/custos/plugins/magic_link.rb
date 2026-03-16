@@ -4,6 +4,7 @@ module Custos
   module Plugins
     module MagicLink
       DEFAULT_EXPIRY = 15 * 60 # 15 minutes in seconds
+      DEFAULT_COOLDOWN = 60 # 1 minute between requests
 
       def self.apply(model_class, **_options)
         model_class.has_many :custos_magic_link_tokens,
@@ -19,10 +20,17 @@ module Custos
           record = find_by(email: email)
           return nil unless record
 
+          options = custos_config.plugin_options(:magic_link)
+          cooldown = options.fetch(:cooldown, DEFAULT_COOLDOWN)
+          if cooldown.positive?
+            last_token = record.custos_magic_link_tokens.order(created_at: :desc).first
+            return nil if last_token && last_token.created_at > cooldown.seconds.ago
+          end
+
           record.custos_magic_link_tokens.valid_tokens.update_all(used_at: Time.current)
 
           token = Custos::TokenGenerator.generate
-          expiry = custos_config.plugin_options(:magic_link).fetch(:expiry, DEFAULT_EXPIRY)
+          expiry = options.fetch(:expiry, DEFAULT_EXPIRY)
 
           record.custos_magic_link_tokens.create!(
             token_digest: Custos::TokenGenerator.digest(token),
