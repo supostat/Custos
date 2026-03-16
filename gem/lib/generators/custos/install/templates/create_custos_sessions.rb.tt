@@ -1,0 +1,19 @@
+class CreateCustosSessions < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :custos_sessions do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :session_token_digest, null: false
+      t.string :ip_address
+      t.string :user_agent
+      t.datetime :last_active_at
+      t.datetime :revoked_at
+
+      t.timestamps
+    end
+
+    add_index :custos_sessions, :session_token_digest, unique: true
+    add_index :custos_sessions, %i[authenticatable_type authenticatable_id],
+              name: "index_custos_sessions_on_authenticatable"
+  end
+end

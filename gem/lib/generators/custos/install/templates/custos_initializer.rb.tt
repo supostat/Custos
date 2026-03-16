@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+Custos.configure do |config|
+  # Session expiry in seconds (default: 24 hours)
+  # config.session_expiry = 24 * 60 * 60
+
+  # Session renewal interval in seconds (default: 1 hour)
+  # config.session_renewal_interval = 60 * 60
+
+  # Token length in bytes (default: 32)
+  # config.token_length = 32
+end
