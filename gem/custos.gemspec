@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
   spec.metadata['allowed_push_host'] = 'https://rubygems.org'
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['{lib}/**/*', 'LICENSE.txt', 'CHANGELOG.md']
+    Dir['{lib}/**/*', 'LICENSE.txt', 'CHANGELOG.md', 'README.md']
   end
 
   spec.require_paths = ['lib']
