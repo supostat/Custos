@@ -42,7 +42,7 @@ module Custos
         def password=(plain_password)
           @password = plain_password
           @password_changed = true
-          self.password_digest = plain_password.present? ? Argon2::Password.create(plain_password) : nil
+          self.password_digest = plain_password.present? ? create_argon2_hash(plain_password) : nil
         end
 
         def authenticate_password(plain_password)
@@ -64,6 +64,16 @@ module Custos
         def clear_password_instance_variable
           @password = nil
           @password_changed = false
+        end
+
+        def create_argon2_hash(plain_password)
+          options = self.class.custos_config.plugin_options(:password)
+          argon2_params = {}
+          argon2_params[:t_cost] = options[:t_cost] if options.key?(:t_cost)
+          argon2_params[:m_cost] = options[:m_cost] if options.key?(:m_cost)
+          argon2_params[:p_cost] = options[:p_cost] if options.key?(:p_cost)
+
+          Argon2::Password.create(plain_password, **argon2_params)
         end
       end
 

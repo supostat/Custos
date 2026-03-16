@@ -27,6 +27,12 @@ Metrics/AbcSize:
   Exclude:
     - "lib/custos/mfa_encryptor.rb"
     - "lib/custos/plugins/lockout.rb"
+    - "lib/custos/plugins/magic_link.rb"
+    - "lib/custos/plugins/mfa.rb"
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - "lib/custos/plugins/mfa.rb"
 
 Metrics/MethodLength:
   Max: 20

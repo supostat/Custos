@@ -20,9 +20,12 @@ module Custos
       @callback_error_strategy = :log           # :log or :raise
     end
 
+    VALID_CLASS_NAME = /\A[A-Z][A-Za-z0-9]*(::[A-Z][A-Za-z0-9]*)*\z/
+
     def model_class_for_scope(scope)
       class_name = @scope_map[scope.to_sym]
       return nil unless class_name
+      return nil unless class_name.match?(VALID_CLASS_NAME)
 
       class_name.constantize
     rescue NameError

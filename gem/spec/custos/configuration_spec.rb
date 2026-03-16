@@ -52,6 +52,16 @@ RSpec.describe Custos::Configuration do
       config.scope_map = { bad: 'NonexistentModel' }
       expect(config.model_class_for_scope(:bad)).to be_nil
     end
+
+    it 'rejects invalid class names to prevent code injection' do
+      config.scope_map = { evil: 'system("whoami")' }
+      expect(config.model_class_for_scope(:evil)).to be_nil
+    end
+
+    it 'accepts namespaced class names like A::B' do
+      config.scope_map = { admin: 'TestUser' }
+      expect(config.model_class_for_scope(:admin)).to eq(TestUser)
+    end
   end
 end
 
