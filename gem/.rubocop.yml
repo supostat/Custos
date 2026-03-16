@@ -1,0 +1,72 @@
+plugins:
+  - rubocop-rails
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "example/**/*"
+    - "website/**/*"
+    - "vendor/**/*"
+
+Style/Documentation:
+  Enabled: false
+
+Style/OneClassPerFile:
+  Exclude:
+    - "spec/**/*"
+
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "custos.gemspec"
+
+Metrics/AbcSize:
+  Exclude:
+    - "lib/custos/mfa_encryptor.rb"
+
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/ModuleLength:
+  Max: 120
+
+Metrics/CyclomaticComplexity:
+  Max: 9
+
+Naming/PredicateMethod:
+  Enabled: false
+
+Naming/PredicatePrefix:
+  Enabled: false
+
+Rails/ApplicationRecord:
+  Enabled: false
+
+Rails/BulkChangeTable:
+  Enabled: false
+
+Rails/DynamicFindBy:
+  Enabled: false
+
+Rails/I18nLocaleTexts:
+  Enabled: false
+
+Rails/SkipsModelValidations:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Max: 20
+
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/MultipleDescribes:
+  Exclude:
+    - "spec/custos/configuration_spec.rb"
+
+RSpec/IdenticalEqualityAssertion:
+  Exclude:
+    - "spec/custos/token_generator_spec.rb"
