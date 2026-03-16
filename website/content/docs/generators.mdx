@@ -1,0 +1,199 @@
+---
+title: Generators
+description: Rails generators for scaffolding Custos migrations and configuration
+---
+
+# Generators
+
+Custos provides two Rails generators that scaffold all necessary migrations and configuration files.
+
+## Install Generator
+
+```bash
+rails generate custos:install
+```
+
+Creates:
+
+| File | Description |
+|------|-------------|
+| `config/initializers/custos.rb` | Global configuration |
+| `db/migrate/TIMESTAMP_create_custos_sessions.rb` | Sessions table migration |
+
+### Generated Initializer
+
+```ruby
+# config/initializers/custos.rb
+Custos.configure do |config|
+  config.session_expiry = 24 * 60 * 60           # 24 hours
+  config.session_renewal_interval = 60 * 60       # 1 hour
+  config.token_length = 32                        # bytes
+end
+```
+
+### Generated Sessions Migration
+
+```ruby
+class CreateCustosSessions < ActiveRecord::Migration[7.0]
+  def change
+    create_table :custos_sessions do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :session_token_digest, null: false
+      t.string :ip_address
+      t.string :user_agent
+      t.datetime :last_active_at
+      t.datetime :revoked_at
+
+      t.timestamps
+    end
+
+    add_index :custos_sessions, :session_token_digest, unique: true
+    add_index :custos_sessions, [:authenticatable_type, :authenticatable_id]
+  end
+end
+```
+
+## Model Generator
+
+```bash
+rails generate custos:model MODEL [plugins...]
+```
+
+Generates migrations based on which plugins you specify.
+
+### Example
+
+```bash
+rails generate custos:model User password magic_link mfa lockout email_confirmation remember_me
+```
+
+This creates:
+
+| Migration | When Generated |
+|-----------|---------------|
+| `add_custos_columns_to_users.rb` | Always (if password, lockout, or email_confirmation selected) |
+| `create_custos_magic_links.rb` | If `magic_link` selected |
+| `create_custos_api_tokens.rb` | If `api_tokens` selected |
+| `create_custos_mfa_credentials.rb` | If `mfa` selected |
+| `create_custos_remember_tokens.rb` | If `remember_me` selected |
+
+### Columns Migration
+
+When password, lockout, or email_confirmation plugins are selected, a migration is generated to add columns to your existing model table:
+
+```ruby
+class AddCustosColumnsToUsers < ActiveRecord::Migration[7.0]
+  def change
+    # Password plugin
+    add_column :users, :password_digest, :string
+
+    # Lockout plugin
+    add_column :users, :failed_auth_count, :integer, default: 0, null: false
+    add_column :users, :locked_at, :datetime
+
+    # Email Confirmation plugin
+    add_column :users, :email_confirmed_at, :datetime
+    add_column :users, :email_confirmation_token_digest, :string
+    add_column :users, :email_confirmation_sent_at, :datetime
+  end
+end
+```
+
+Only the columns for the selected plugins are included.
+
+### Magic Links Migration
+
+```ruby
+class CreateCustosMagicLinks < ActiveRecord::Migration[7.0]
+  def change
+    create_table :custos_magic_links do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :token_digest, null: false
+      t.datetime :expires_at, null: false
+      t.datetime :used_at
+
+      t.datetime :created_at, null: false
+    end
+
+    add_index :custos_magic_links, :token_digest, unique: true
+    add_index :custos_magic_links, [:authenticatable_type, :authenticatable_id]
+  end
+end
+```
+
+### API Tokens Migration
+
+```ruby
+class CreateCustosApiTokens < ActiveRecord::Migration[7.0]
+  def change
+    create_table :custos_api_tokens do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :token_digest, null: false
+      t.datetime :last_used_at
+      t.datetime :revoked_at
+
+      t.timestamps
+    end
+
+    add_index :custos_api_tokens, :token_digest, unique: true
+    add_index :custos_api_tokens, [:authenticatable_type, :authenticatable_id]
+  end
+end
+```
+
+### MFA Credentials Migration
+
+```ruby
+class CreateCustosMfaCredentials < ActiveRecord::Migration[7.0]
+  def change
+    create_table :custos_mfa_credentials do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :method, null: false
+      t.text :secret_data, null: false
+      t.datetime :enabled_at
+
+      t.timestamps
+    end
+
+    add_index :custos_mfa_credentials,
+              [:authenticatable_type, :authenticatable_id, :method],
+              unique: true,
+              name: "index_custos_mfa_on_authenticatable_and_method"
+  end
+end
+```
+
+### Remember Tokens Migration
+
+```ruby
+class CreateCustosRememberTokens < ActiveRecord::Migration[7.0]
+  def change
+    create_table :custos_remember_tokens do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :token_digest, null: false
+      t.datetime :expires_at, null: false
+
+      t.datetime :created_at, null: false
+    end
+
+    add_index :custos_remember_tokens, :token_digest, unique: true
+    add_index :custos_remember_tokens, [:authenticatable_type, :authenticatable_id]
+  end
+end
+```
+
+## Multiple Models
+
+You can run the model generator for each authenticatable model independently:
+
+```bash
+rails generate custos:model User password magic_link mfa lockout email_confirmation remember_me
+rails generate custos:model ApiClient api_tokens
+```
+
+The shared tables (`custos_sessions`, `custos_magic_links`, etc.) use polymorphic associations, so they support multiple models out of the box.

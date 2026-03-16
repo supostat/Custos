@@ -1,0 +1,169 @@
+---
+title: Lockout
+description: Account lockout after failed authentication attempts
+---
+
+# Lockout Plugin
+
+The Lockout plugin protects accounts from brute-force attacks by locking them after a configurable number of failed authentication attempts.
+
+## Setup
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :password
+    plugin :lockout
+  end
+end
+```
+
+Run the model generator:
+
+```bash
+rails generate custos:model User password lockout
+rails db:migrate
+```
+
+This adds `failed_auth_count` and `locked_at` columns to your model's table.
+
+## Configuration Options
+
+```ruby
+custos do
+  plugin :lockout,
+    max_attempts: 5,
+    lockout_duration: 60 * 60  # 1 hour
+end
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `max_attempts` | `Integer` | `3` | Failed attempts before lockout |
+| `lockout_duration` | `Integer` or `nil` | `1800` (30 min) | Lockout duration in seconds. `nil` = permanent |
+
+## Instance Methods
+
+### `locked?`
+
+Returns `true` if the account is currently locked. If `lockout_duration` is set, the lock expires automatically after the specified period.
+
+```ruby
+user.locked?
+# => true (if locked and within lockout duration)
+# => false (if lock has expired or account was never locked)
+```
+
+### `record_failed_attempt!`
+
+Increments the failed attempt counter. If the counter reaches `max_attempts`, the account is locked immediately.
+
+```ruby
+user.record_failed_attempt!
+# failed_auth_count goes from 2 to 3 → account locked
+```
+
+### `reset_failed_attempts!`
+
+Resets the counter and clears the lock. Called automatically by the Password plugin on successful authentication.
+
+```ruby
+user.reset_failed_attempts!
+# failed_auth_count → 0, locked_at → nil
+```
+
+### `unlock!`
+
+Manually unlocks the account and resets the counter. Use this for admin-initiated unlocks.
+
+```ruby
+user.unlock!
+```
+
+## Integration with Password Plugin
+
+When both Password and Lockout plugins are enabled, they work together automatically through an internal event hook. The Lockout plugin subscribes to the `:after_authentication` hook fired by the Password plugin:
+
+1. `User.find_by_email_and_password` checks `locked?` before attempting verification. If locked, returns `nil`.
+2. On failed password verification, the hook triggers `record_failed_attempt!` (uses atomic SQL increment).
+3. On successful verification, the hook triggers `reset_failed_attempts!`.
+
+No additional code is needed in your controllers.
+
+```ruby
+custos do
+  plugin :password
+  plugin :lockout, max_attempts: 5, lockout_duration: 15 * 60
+end
+
+# This handles lockout automatically:
+user = User.find_by_email_and_password(email: "alice@example.com", password: "wrong")
+# => nil (and failed_auth_count incremented)
+```
+
+## Controller Example
+
+### Admin Unlock
+
+```ruby
+class Admin::UsersController < ApplicationController
+  before_action :require_admin
+
+  def unlock
+    user = User.find(params[:id])
+    user.unlock!
+    redirect_to admin_user_path(user), notice: "Account unlocked."
+  end
+end
+```
+
+### Showing Lock Status
+
+```ruby
+class SessionsController < ApplicationController
+  def create
+    user = User.find_by(email: params[:email])
+
+    if user&.locked?
+      flash[:alert] = "Account is temporarily locked. Please try again later."
+      render :new, status: :unprocessable_entity
+      return
+    end
+
+    user = User.find_by_email_and_password(
+      email: params[:email],
+      password: params[:password]
+    )
+
+    if user
+      _session, token = Custos::SessionManager.create(user, request: request)
+      cookies.signed[:custos_session_token] = {
+        value: token,
+        httponly: true,
+        secure: Rails.env.production?
+      }
+      redirect_to dashboard_path
+    else
+      flash[:alert] = "Invalid email or password."
+      render :new, status: :unprocessable_entity
+    end
+  end
+end
+```
+
+## Database Columns
+
+Added to your model's table:
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `failed_auth_count` | `integer` | `0` | Tracks consecutive failures |
+| `locked_at` | `datetime` | `nil` | When the account was locked |
+
+## Security Notes
+
+- Lockout is time-based by default (30 minutes). Set `lockout_duration: nil` for permanent lockout requiring manual admin intervention.
+- The counter resets to zero on successful authentication, so legitimate users are never impacted by a single failed attempt in the past.
+- Consider showing a generic "Invalid email or password" message instead of "Account locked" to avoid revealing account existence.

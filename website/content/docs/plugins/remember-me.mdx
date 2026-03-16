@@ -1,0 +1,174 @@
+---
+title: Remember Me
+description: Long-lived sessions with persistent tokens
+---
+
+# Remember Me Plugin
+
+The Remember Me plugin creates long-lived tokens that allow users to stay signed in across browser sessions. This is the "Remember me" checkbox on a sign-in form.
+
+## Setup
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :remember_me
+  end
+end
+```
+
+Run the model generator:
+
+```bash
+rails generate custos:model User remember_me
+rails db:migrate
+```
+
+This creates the `custos_remember_tokens` table.
+
+## Configuration Options
+
+```ruby
+custos do
+  plugin :remember_me, remember_duration: 14 * 24 * 60 * 60  # 14 days
+end
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `remember_duration` | `Integer` | `2592000` (30 days) | How long the token remains valid, in seconds |
+
+## Instance Methods
+
+### `generate_remember_token`
+
+Creates a new persistent remember token for the user. Returns the plain-text token to be stored in a cookie.
+
+```ruby
+token = user.generate_remember_token
+# => "xYzAbC123..." (store in a persistent cookie)
+```
+
+### `forget_me!`
+
+Destroys all remember tokens for the user. Call this on explicit sign-out.
+
+```ruby
+user.forget_me!
+```
+
+### `custos_remember_tokens`
+
+An Active Record association returning all remember tokens:
+
+```ruby
+user.custos_remember_tokens
+# => [#<Custos::RememberToken id: 1, ...>]
+```
+
+## Class Methods
+
+### `authenticate_remember_token(token)`
+
+Verifies a remember token. Finds the token by its digest, checks that it hasn't expired, and returns the associated user. Returns `nil` if the token is invalid or expired.
+
+```ruby
+user = User.authenticate_remember_token("xYzAbC123...")
+# => #<User id: 1, ...>
+```
+
+## Controller Example
+
+### Sign In with Remember Me
+
+```ruby
+class SessionsController < ApplicationController
+  def create
+    user = User.find_by_email_and_password(
+      email: params[:email],
+      password: params[:password]
+    )
+
+    if user
+      _session, session_token = Custos::SessionManager.create(user, request: request)
+      cookies.signed[:custos_session_token] = {
+        value: session_token,
+        httponly: true,
+        secure: Rails.env.production?
+      }
+
+      if params[:remember_me] == "1"
+        remember_token = user.generate_remember_token
+        cookies.signed[:custos_remember_token] = {
+          value: remember_token,
+          httponly: true,
+          secure: Rails.env.production?,
+          expires: 30.days.from_now
+        }
+      end
+
+      redirect_to dashboard_path
+    else
+      flash[:alert] = "Invalid email or password."
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    custos_session&.then { |s| Custos::SessionManager.revoke(s) }
+    custos_current&.forget_me!
+    cookies.delete(:custos_session_token)
+    cookies.delete(:custos_remember_token)
+    redirect_to root_path
+  end
+end
+```
+
+### Restoring Session from Remember Token
+
+```ruby
+class ApplicationController < ActionController::Base
+  before_action :restore_session_from_remember_token
+
+  private
+
+  def restore_session_from_remember_token
+    return if custos_authenticated?
+
+    remember_token = cookies.signed[:custos_remember_token]
+    return unless remember_token
+
+    user = User.authenticate_remember_token(remember_token)
+    return unless user
+
+    _session, session_token = Custos::SessionManager.create(user, request: request)
+    cookies.signed[:custos_session_token] = {
+      value: session_token,
+      httponly: true,
+      secure: Rails.env.production?
+    }
+  end
+end
+```
+
+## Database Schema
+
+### `custos_remember_tokens`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | Primary key |
+| `authenticatable_type` | `string` | Polymorphic type |
+| `authenticatable_id` | `bigint` | Polymorphic ID |
+| `token_digest` | `string` | SHA-256 digest, unique index |
+| `expires_at` | `datetime` | When the token expires |
+| `created_at` | `datetime` | Creation timestamp |
+
+## Security Notes
+
+- Only the **SHA-256 digest** is stored; the plain-text token is set in a cookie once
+- Tokens have an explicit expiry (`expires_at`) checked server-side
+- `forget_me!` destroys all tokens, effectively signing out from all remembered sessions
+- The cookie should always be set with `httponly: true` and `secure: true` in production

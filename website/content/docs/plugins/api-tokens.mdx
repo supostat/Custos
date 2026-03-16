@@ -1,0 +1,168 @@
+---
+title: API Tokens
+description: Bearer token authentication for API clients
+---
+
+# API Tokens Plugin
+
+The API Tokens plugin provides simple bearer token authentication for APIs. Each authenticatable record can have multiple API tokens that are independently revocable.
+
+## Setup
+
+```ruby
+class ApiClient < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :api_tokens
+  end
+end
+```
+
+Run the model generator:
+
+```bash
+rails generate custos:model ApiClient api_tokens
+rails db:migrate
+```
+
+This creates the `custos_api_tokens` table.
+
+## Instance Methods
+
+### `generate_api_token`
+
+Creates a new API token for the record. Returns the plain-text token. This is the **only time** the plain-text token is available -- store or display it immediately.
+
+```ruby
+api_client = ApiClient.find(1)
+token = api_client.generate_api_token
+# => "xYz123AbC..." (show this to the user once)
+```
+
+### `custos_api_tokens`
+
+An Active Record association returning all API tokens for the record:
+
+```ruby
+api_client.custos_api_tokens
+# => [#<Custos::ApiToken id: 1, ...>, #<Custos::ApiToken id: 2, ...>]
+```
+
+## Class Methods
+
+### `authenticate_api_token(token)`
+
+Verifies a bearer token. Finds the token by its digest, checks that it hasn't been revoked, updates `last_used_at`, and returns the associated record. Returns `nil` if the token is invalid or revoked.
+
+```ruby
+api_client = ApiClient.authenticate_api_token("xYz123AbC...")
+# => #<ApiClient id: 1, ...>
+```
+
+## Token Methods
+
+Each `Custos::ApiToken` record has:
+
+### `revoke!`
+
+Marks the token as revoked. It can no longer be used for authentication.
+
+```ruby
+token_record = api_client.custos_api_tokens.first
+token_record.revoke!
+```
+
+### `revoked?`
+
+Returns whether the token has been revoked.
+
+```ruby
+token_record.revoked?
+# => true
+```
+
+## Controller Example
+
+### Authenticating with Tokens
+
+API tokens are used via the `Authorization: Bearer` header. Create a base controller that authenticates via `authenticate_api_token`:
+
+```ruby
+class Api::BaseController < ActionController::Base
+  protect_from_forgery with: :null_session
+
+  rescue_from Custos::NotAuthenticatedError do
+    render json: { error: "Authentication required" }, status: :unauthorized
+  end
+
+  private
+
+  def authenticate_api_client!
+    token = request.headers["Authorization"]&.delete_prefix("Bearer ")
+    @current_api_client = ApiClient.authenticate_api_token(token) if token
+    raise Custos::NotAuthenticatedError unless @current_api_client
+  end
+
+  def current_api_client
+    @current_api_client
+  end
+end
+```
+
+### Token Management
+
+```ruby
+class Api::TokensController < Api::BaseController
+  before_action :authenticate_api_client!
+
+  def create
+    token = current_api_client.generate_api_token
+    render json: { token: token }, status: :created
+  end
+
+  def destroy
+    token_record = current_api_client.custos_api_tokens.find(params[:id])
+    token_record.revoke!
+    head :no_content
+  end
+end
+```
+
+### Protected Resources
+
+```ruby
+class Api::ResourcesController < Api::BaseController
+  before_action :authenticate_api_client!
+
+  def index
+    render json: current_api_client.resources
+  end
+end
+```
+
+```bash
+curl -H "Authorization: Bearer xYz123AbC..." https://api.example.com/resource
+```
+
+## Database Schema
+
+### `custos_api_tokens`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | Primary key |
+| `authenticatable_type` | `string` | Polymorphic type |
+| `authenticatable_id` | `bigint` | Polymorphic ID |
+| `token_digest` | `string` | SHA-256 digest, unique index |
+| `last_used_at` | `datetime` | Updated on each authentication |
+| `revoked_at` | `datetime` | Set when token is revoked |
+| `created_at` | `datetime` | Creation timestamp |
+| `updated_at` | `datetime` | Update timestamp |
+
+## Security Notes
+
+- Only the **SHA-256 digest** is stored; the plain-text token is returned once at creation
+- Revoked tokens are permanently invalidated
+- `last_used_at` is tracked for auditing
+- Token verification uses `ActiveSupport::SecurityUtils.secure_compare` for timing-safe comparison

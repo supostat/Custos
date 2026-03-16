@@ -1,0 +1,191 @@
+---
+title: Session Management
+description: Custom session table with revocation, device tracking, and multi-session control
+---
+
+# Session Management
+
+Custos manages sessions in its own database table instead of relying on the default Rails session. This gives you full control: list active sessions, revoke individual ones, sign out from all devices, and track device information.
+
+## How Sessions Work
+
+When a user signs in, Custos creates a `Custos::Session` record and returns a plain-text token. The token is sent to the client (via cookie or API response), and only its **SHA-256 digest** is stored in the database. On each request, the token is looked up by computing its digest.
+
+```ruby
+# Creating a session
+session, token = Custos::SessionManager.create(user, request: request)
+```
+
+The session record stores:
+- `session_token_digest` -- for token lookup
+- `ip_address` -- from `request.remote_ip`
+- `user_agent` -- from `request.user_agent`
+- `last_active_at` -- periodically updated based on `session_renewal_interval`
+- `revoked_at` -- set when the session is revoked
+
+## SessionManager API
+
+### `SessionManager.create(authenticatable, request:)`
+
+Creates a new session for the given record. Returns a `[session, token]` pair.
+
+```ruby
+session, token = Custos::SessionManager.create(user, request: request)
+
+cookies.signed[:custos_session_token] = {
+  value: token,
+  httponly: true,
+  secure: Rails.env.production?
+}
+```
+
+### `SessionManager.find_by_token(token, authenticatable_type: nil)`
+
+Finds an active (not revoked, not expired) session by its token. Also updates `last_active_at` if the renewal interval has passed. Returns the `Custos::Session` record or `nil`.
+
+When `authenticatable_type` is provided, sessions are filtered by the model class name, ensuring that a User session token cannot be used to authenticate as an ApiClient.
+
+```ruby
+session = Custos::SessionManager.find_by_token(token)
+session.authenticatable # => #<User id: 1, ...>
+
+# With scope filtering
+session = Custos::SessionManager.find_by_token(token, authenticatable_type: "User")
+```
+
+### `SessionManager.revoke(session)`
+
+Revokes a single session by setting `revoked_at`.
+
+```ruby
+Custos::SessionManager.revoke(session)
+```
+
+### `SessionManager.revoke_all(authenticatable)`
+
+Revokes all active sessions for a record. Use this for "Sign out everywhere".
+
+```ruby
+Custos::SessionManager.revoke_all(user)
+```
+
+### `SessionManager.active_for(authenticatable)`
+
+Returns all active sessions for a record, ordered by most recent activity. Use this to display active sessions.
+
+```ruby
+sessions = Custos::SessionManager.active_for(user)
+sessions.each do |s|
+  puts "#{s.ip_address} - #{s.user_agent} - #{s.last_active_at}"
+end
+```
+
+## Session Model
+
+`Custos::Session` is an Active Record model with these scopes:
+
+```ruby
+Custos::Session.active    # not revoked, not expired
+Custos::Session.revoked   # explicitly revoked
+```
+
+The `active` scope filters by:
+1. `revoked_at IS NULL`
+2. `created_at > session_expiry.ago`
+
+## Controller Examples
+
+### Listing Active Sessions
+
+```ruby
+class SessionsController < ApplicationController
+  before_action :custos_authenticate!
+
+  def index
+    @sessions = Custos::SessionManager.active_for(custos_current)
+    @current_session = custos_session
+  end
+end
+```
+
+```erb
+<%% @sessions.each do |session| %>
+  <div>
+    <p><strong>IP:</strong> <%%= session.ip_address %></p>
+    <p><strong>Device:</strong> <%%= session.user_agent %></p>
+    <p><strong>Last active:</strong> <%%= time_ago_in_words(session.last_active_at) %> ago</p>
+    <%% unless session == @current_session %>
+      <%%= button_to "Revoke", session_path(session), method: :delete %>
+    <%% end %>
+  </div>
+<%% end %>
+```
+
+### Revoking a Single Session
+
+```ruby
+class SessionsController < ApplicationController
+  before_action :custos_authenticate!
+
+  def destroy
+    session = custos_current.custos_sessions.active.find(params[:id])
+    Custos::SessionManager.revoke(session)
+    redirect_to sessions_path, notice: "Session revoked."
+  end
+end
+```
+
+### Sign Out Everywhere
+
+```ruby
+class SessionsController < ApplicationController
+  before_action :custos_authenticate!
+
+  def destroy_all
+    Custos::SessionManager.revoke_all(custos_current)
+    cookies.delete(:custos_session_token)
+    redirect_to sign_in_path, notice: "Signed out from all devices."
+  end
+end
+```
+
+## Activity Tracking
+
+`last_active_at` is updated based on the `session_renewal_interval` configuration. This avoids a database write on every request while still providing reasonable activity tracking.
+
+```ruby
+Custos.configure do |config|
+  config.session_renewal_interval = 15 * 60  # update every 15 minutes
+end
+```
+
+With the default interval of 1 hour, `last_active_at` is updated at most once per hour per session.
+
+## Database Schema
+
+### `custos_sessions`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | Primary key |
+| `authenticatable_type` | `string` | Polymorphic type |
+| `authenticatable_id` | `bigint` | Polymorphic ID |
+| `session_token_digest` | `string` | SHA-256 digest, unique index |
+| `ip_address` | `string` | From `request.remote_ip` |
+| `user_agent` | `string` | From `request.user_agent` |
+| `last_active_at` | `datetime` | Periodically updated |
+| `revoked_at` | `datetime` | Set when revoked |
+| `created_at` | `datetime` | Creation timestamp |
+| `updated_at` | `datetime` | Update timestamp |
+
+Indexes:
+- Unique index on `session_token_digest`
+- Composite index on `[authenticatable_type, authenticatable_id]`
+
+## Security Notes
+
+- Session tokens are **256-bit entropy** (`SecureRandom.urlsafe_base64(32)`)
+- Only the **SHA-256 digest** is stored in the database
+- Sessions expire automatically based on `session_expiry` (default: 24 hours)
+- Revoked sessions are permanently invalidated and cannot be restored
+- `last_active_at` is updated with `update_column` (no callbacks/validations) for performance

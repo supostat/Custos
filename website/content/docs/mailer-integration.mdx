@@ -1,0 +1,181 @@
+---
+title: Mailer Integration
+description: How to connect your email and SMS delivery with Custos callbacks
+---
+
+# Mailer Integration
+
+Custos does **not** include its own mailer or SMS sender. Instead, it provides a callback system that fires events at the right moments. You bring your own delivery mechanism -- Action Mailer, Postmark, Twilio, or anything else.
+
+## How Callbacks Work
+
+Register callbacks inside the `custos` block on your model using `on(:event_name)`:
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :magic_link
+    plugin :email_confirmation
+    plugin :mfa
+
+    on(:magic_link_created) do |record, token|
+      AuthMailer.magic_link(record, token).deliver_later
+    end
+
+    on(:email_confirmation_requested) do |record, token|
+      AuthMailer.confirm_email(record, token).deliver_later
+    end
+
+    on(:sms_code_created) do |record, code|
+      SmsService.send(record.phone, "Your verification code: #{code}")
+    end
+  end
+end
+```
+
+When a plugin fires an event, the `CallbackRegistry` finds all registered callbacks for that event on the model and calls them in order.
+
+## Available Events
+
+| Event | Fired By | Arguments | Purpose |
+|-------|----------|-----------|---------|
+| `:magic_link_created` | Magic Link plugin | `(record, token)` | Send the magic link email |
+| `:email_confirmation_requested` | Email Confirmation plugin | `(record, token)` | Send the confirmation email |
+| `:sms_code_created` | MFA plugin (SMS) | `(record, code)` | Send the SMS verification code |
+
+### Argument Details
+
+- `record` -- the authenticatable model instance (e.g., the `User`)
+- `token` -- a plain-text token string (for constructing URLs)
+- `code` -- a 6-digit string code (for SMS)
+
+## Action Mailer Example
+
+```ruby
+class AuthMailer < ApplicationMailer
+  def magic_link(user, token)
+    @user = user
+    @url = magic_link_url(token: token)
+    mail(to: user.email, subject: "Your sign-in link")
+  end
+
+  def confirm_email(user, token)
+    @user = user
+    @url = email_confirmation_url(user_id: user.id, token: token)
+    mail(to: user.email, subject: "Please confirm your email")
+  end
+end
+```
+
+## SMS Service Example
+
+You can use any SMS provider. Here's a simple example with Twilio:
+
+```ruby
+class SmsService
+  def self.send(phone_number, message)
+    client = Twilio::REST::Client.new(
+      Rails.application.credentials.twilio[:account_sid],
+      Rails.application.credentials.twilio[:auth_token]
+    )
+
+    client.messages.create(
+      from: Rails.application.credentials.twilio[:phone_number],
+      to: phone_number,
+      body: message
+    )
+  end
+end
+```
+
+And register it:
+
+```ruby
+on(:sms_code_created) do |record, code|
+  SmsService.send(record.phone, "Your verification code: #{code}")
+end
+```
+
+## Multiple Callbacks per Event
+
+You can register multiple callbacks for the same event. They execute in registration order:
+
+```ruby
+custos do
+  plugin :magic_link
+
+  on(:magic_link_created) do |record, token|
+    AuthMailer.magic_link(record, token).deliver_later
+  end
+
+  on(:magic_link_created) do |record, _token|
+    Rails.logger.info("Magic link generated for #{record.email}")
+  end
+end
+```
+
+## Different Models, Different Callbacks
+
+Since callbacks are per-model, you can have different delivery strategies for different models:
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :magic_link
+
+    on(:magic_link_created) do |record, token|
+      UserMailer.magic_link(record, token).deliver_later
+    end
+  end
+end
+
+class AdminUser < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :magic_link
+
+    on(:magic_link_created) do |record, token|
+      AdminMailer.magic_link(record, token).deliver_later
+      SlackNotifier.notify("Admin login attempt: #{record.email}")
+    end
+  end
+end
+```
+
+## Callback Internals
+
+The `CallbackRegistry` is straightforward:
+
+```ruby
+Custos::CallbackRegistry.fire(User, :magic_link_created, user, token)
+```
+
+This looks up `User.custos_config.callbacks[:magic_link_created]` and calls each registered block with the provided arguments.
+
+## Testing Callbacks
+
+In tests, you can verify callbacks are registered and fire correctly:
+
+```ruby
+RSpec.describe User do
+  describe "callbacks" do
+    it "fires :magic_link_created when generating a magic link" do
+      user = create(:user)
+      expect(AuthMailer).to receive(:magic_link).and_call_original
+      User.generate_magic_link(user.email)
+    end
+  end
+end
+```
+
+Or check the registration directly:
+
+```ruby
+config = User.custos_config
+expect(config.callbacks[:magic_link_created]).not_to be_empty
+```

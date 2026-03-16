@@ -1,0 +1,145 @@
+---
+title: Example App
+description: A Rails demo application showcasing all Custos features
+---
+
+# Example App
+
+Custos includes a complete Rails demo application in the `example/` directory of the gem. It demonstrates every plugin and feature in a working application.
+
+## What's Included
+
+The example app showcases:
+
+- Registration and sign-in with email + password
+- Passwordless sign-in via magic link
+- Two-factor authentication (TOTP + backup codes + SMS)
+- API authentication with bearer tokens
+- Account lockout after failed attempts
+- Email confirmation
+- Remember me (persistent sessions)
+- Session management (list active sessions, revoke, sign out everywhere)
+- Two authenticatable models: `User` and `ApiClient`
+
+## Models
+
+### User (Full Plugin Suite)
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :password, min_length: 8, require_digit: true
+    plugin :magic_link
+    plugin :mfa
+    plugin :lockout, max_attempts: 3, lockout_duration: 30 * 60
+    plugin :email_confirmation
+    plugin :remember_me
+
+    on(:magic_link_created) do |record, token|
+      AuthMailer.magic_link(record, token).deliver_later
+    end
+
+    on(:email_confirmation_requested) do |record, token|
+      AuthMailer.confirm_email(record, token).deliver_later
+    end
+
+    on(:sms_code_created) do |record, code|
+      SmsService.send(record.phone, "Your code: #{code}")
+    end
+  end
+end
+```
+
+### ApiClient (API Tokens Only)
+
+```ruby
+class ApiClient < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :api_tokens
+  end
+end
+```
+
+## Running the Example
+
+```bash
+cd example
+bundle install
+rails db:create db:migrate
+rails server
+```
+
+## Key Flows
+
+### Sign Up
+
+1. User submits email and password
+2. Account is created with `password=` (hashed with Argon2)
+3. Email confirmation token is generated
+4. `:email_confirmation_requested` callback sends the email
+5. User clicks the link to confirm
+
+### Sign In with Password
+
+1. `User.find_by_email_and_password(email:, password:)` is called
+2. If Lockout is enabled, locked accounts are rejected
+3. On success, a session is created via `SessionManager.create`
+4. If MFA is enabled, user is redirected to MFA verification
+5. Optionally, a remember token is generated
+
+### Sign In with Magic Link
+
+1. `User.generate_magic_link(email)` generates a token
+2. `:magic_link_created` callback sends the email
+3. User clicks the link
+4. `User.authenticate_magic_link(token)` verifies and consumes the token
+5. A session is created
+
+### MFA Setup
+
+1. `user.setup_totp(issuer: "ExampleApp")` generates a provisioning URI
+2. User scans the QR code
+3. `user.confirm_totp!(code)` confirms the setup
+4. Backup codes are generated with `user.generate_backup_codes`
+
+### Session Management
+
+1. `SessionManager.active_for(user)` lists all active sessions
+2. Each session shows IP, user agent, and last activity
+3. Individual sessions can be revoked
+4. "Sign out everywhere" revokes all sessions
+
+## Directory Structure
+
+```
+example/
+├── app/
+│   ├── controllers/
+│   │   ├── sessions_controller.rb
+│   │   ├── registrations_controller.rb
+│   │   ├── magic_links_controller.rb
+│   │   ├── mfa/
+│   │   │   ├── totp_controller.rb
+│   │   │   └── verifications_controller.rb
+│   │   ├── email_confirmations_controller.rb
+│   │   └── api/
+│   │       └── tokens_controller.rb
+│   ├── models/
+│   │   ├── user.rb
+│   │   └── api_client.rb
+│   ├── mailers/
+│   │   └── auth_mailer.rb
+│   └── views/
+│       └── ...
+├── config/
+│   ├── initializers/
+│   │   └── custos.rb
+│   └── routes.rb
+└── db/
+    └── migrate/
+        └── ...
+```

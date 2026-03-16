@@ -1,0 +1,80 @@
+---
+title: Overview
+description: Plugin-based authentication for Ruby on Rails applications
+---
+
+# Custos
+
+Custos is a plugin-based authentication library for Ruby on Rails. It draws inspiration from [Rodauth](http://rodauth.jeremyevans.net/) for its modular plugin architecture and from [Devise](https://github.com/heartcombo/devise) for its per-model configuration style.
+
+## Why Custos?
+
+Most Rails authentication libraries either give you everything at once (Devise) or require you to build from scratch (hand-rolled). Custos takes a different approach:
+
+- **Only what you need.** Each feature is a standalone plugin. Use password authentication for users and API tokens for service accounts -- on the same app.
+- **Per-model configuration.** Different models can have completely different authentication strategies.
+- **No magic controllers.** Custos provides services and helpers, not generated controllers and routes. You stay in control.
+- **Bring your own mailer.** Email delivery is handled through callbacks. Use Action Mailer, Postmark, or anything else.
+
+## Quick Example
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :password
+    plugin :magic_link
+    plugin :mfa
+    plugin :lockout
+    plugin :email_confirmation
+    plugin :remember_me
+
+    on(:magic_link_created) do |record, token|
+      AuthMailer.magic_link(record, token).deliver_later
+    end
+
+    on(:email_confirmation_requested) do |record, token|
+      AuthMailer.confirm_email(record, token).deliver_later
+    end
+  end
+end
+```
+
+```ruby
+class ApiClient < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :api_tokens
+  end
+end
+```
+
+## Available Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| [Password](/docs/plugins/password) | Email + password authentication with Argon2 hashing |
+| [Magic Link](/docs/plugins/magic-link) | Passwordless authentication via email links |
+| [API Tokens](/docs/plugins/api-tokens) | Bearer token authentication for APIs |
+| [MFA](/docs/plugins/mfa) | TOTP, backup codes, and SMS verification |
+| [Lockout](/docs/plugins/lockout) | Account lockout after failed attempts |
+| [Email Confirmation](/docs/plugins/email-confirmation) | Email verification on sign-up |
+| [Remember Me](/docs/plugins/remember-me) | Long-lived sessions via persistent tokens |
+
+## Requirements
+
+- Ruby 3.2+
+- Rails 7.0+
+- Bundler
+
+## Security
+
+Custos is built with security as the top priority:
+
+- **Argon2id** for password hashing (resistant to GPU/ASIC attacks)
+- **SHA-256 token digests** stored in the database; plain-text tokens are never persisted
+- **Timing-safe comparisons** via `ActiveSupport::SecurityUtils.secure_compare`
+- **Encrypted MFA secrets** using Rails Active Record Encryption
+- **256-bit entropy** session tokens (`SecureRandom.urlsafe_base64(32)`)

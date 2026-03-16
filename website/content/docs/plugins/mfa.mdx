@@ -1,0 +1,227 @@
+---
+title: MFA
+description: Multi-factor authentication with TOTP, backup codes, and SMS
+---
+
+# MFA Plugin
+
+The MFA (Multi-Factor Authentication) plugin adds three independent verification methods: **TOTP** (Time-based One-Time Passwords), **backup codes**, and **SMS codes**. Each can be used standalone or in combination.
+
+## Setup
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :mfa
+
+    on(:sms_code_created) do |record, code|
+      SmsService.send(record.phone, "Your verification code: #{code}")
+    end
+  end
+end
+```
+
+Run the model generator:
+
+```bash
+rails generate custos:model User mfa
+rails db:migrate
+```
+
+This creates the `custos_mfa_credentials` table.
+
+## TOTP (Time-based One-Time Passwords)
+
+TOTP works with authenticator apps like Google Authenticator, Authy, and 1Password.
+
+### `setup_totp(issuer:)`
+
+Generates a TOTP secret and returns a provisioning URI. The user scans this as a QR code in their authenticator app.
+
+```ruby
+provisioning_uri = user.setup_totp(issuer: "MyApp")
+# => "otpauth://totp/MyApp:alice%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=MyApp"
+```
+
+At this point TOTP is **not yet enabled**. The user must confirm by entering a valid code.
+
+### `confirm_totp!(code)`
+
+Confirms TOTP setup by verifying a code from the authenticator app. Returns `true` on success, `false` if the code is invalid. After confirmation, TOTP is marked as enabled.
+
+```ruby
+user.confirm_totp!("123456")
+# => true
+```
+
+### `verify_totp(code)`
+
+Verifies a TOTP code during sign-in. Allows a 30-second drift in both directions.
+
+```ruby
+user.verify_totp("123456")
+# => true
+```
+
+### `totp_enabled?`
+
+Returns whether TOTP has been set up and confirmed for this user.
+
+```ruby
+user.totp_enabled?
+# => true
+```
+
+## Backup Codes
+
+Backup codes are one-time recovery codes in case the user loses access to their authenticator app.
+
+### `generate_backup_codes(count:)`
+
+Generates a set of one-time backup codes. Returns the plain-text codes -- display these to the user **once**. Only the digests are stored.
+
+```ruby
+codes = user.generate_backup_codes(count: 10)
+# => ["a1b2c3d4", "e5f6g7h8", "i9j0k1l2", ...]
+```
+
+Default count is 10.
+
+### `verify_backup_code(code)`
+
+Verifies a backup code. If valid, the code is consumed (removed from the stored digests) and cannot be reused. Returns `true` or `false`.
+
+```ruby
+user.verify_backup_code("a1b2c3d4")
+# => true
+
+# Same code again:
+user.verify_backup_code("a1b2c3d4")
+# => false (already consumed)
+```
+
+## SMS Codes
+
+SMS codes are 6-digit codes sent to the user's phone number.
+
+### `send_sms_code`
+
+Generates a 6-digit code, stores its digest with an expiry, and fires the `:sms_code_created` callback. Returns `true`.
+
+```ruby
+user.send_sms_code
+# Fires :sms_code_created callback with the user and the code
+```
+
+The callback handles delivery:
+
+```ruby
+on(:sms_code_created) do |record, code|
+  SmsService.send(record.phone, "Your code: #{code}")
+end
+```
+
+### `verify_sms_code(code)`
+
+Verifies the SMS code. Checks both the digest match and the expiry (5 minutes by default).
+
+```ruby
+user.verify_sms_code("482917")
+# => true
+```
+
+## General Methods
+
+### `mfa_enabled?`
+
+Returns `true` if any MFA method (TOTP or SMS) is currently enabled.
+
+```ruby
+user.mfa_enabled?
+# => true
+```
+
+## Controller Example
+
+### Setting Up TOTP
+
+```ruby
+class Mfa::TotpController < ApplicationController
+  before_action :custos_authenticate!
+
+  def new
+    @provisioning_uri = custos_current.setup_totp(issuer: "MyApp")
+    # Render a page with a QR code for this URI
+  end
+
+  def create
+    if custos_current.confirm_totp!(params[:code])
+      @backup_codes = custos_current.generate_backup_codes
+      # Show backup codes to the user
+    else
+      flash[:alert] = "Invalid code. Please try again."
+      redirect_to new_mfa_totp_path
+    end
+  end
+end
+```
+
+### Verifying During Sign-In
+
+```ruby
+class Mfa::VerificationsController < ApplicationController
+  def create
+    user = User.find(session[:pending_mfa_user_id])
+
+    verified = if params[:backup_code].present?
+      user.verify_backup_code(params[:backup_code])
+    elsif params[:sms_code].present?
+      user.verify_sms_code(params[:sms_code])
+    else
+      user.verify_totp(params[:totp_code])
+    end
+
+    if verified
+      _session, token = Custos::SessionManager.create(user, request: request)
+      cookies.signed[:custos_session_token] = {
+        value: token,
+        httponly: true,
+        secure: Rails.env.production?
+      }
+      session.delete(:pending_mfa_user_id)
+      redirect_to dashboard_path
+    else
+      flash[:alert] = "Invalid verification code."
+      render :new, status: :unprocessable_entity
+    end
+  end
+end
+```
+
+## Database Schema
+
+### `custos_mfa_credentials`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `bigint` | Primary key |
+| `authenticatable_type` | `string` | Polymorphic type |
+| `authenticatable_id` | `bigint` | Polymorphic ID |
+| `method` | `string` | `totp`, `backup_codes`, or `sms` |
+| `secret_data` | `text` | Encrypted (Rails Active Record Encryption) |
+| `enabled_at` | `datetime` | `nil` until method is confirmed |
+| `created_at` | `datetime` | Creation timestamp |
+| `updated_at` | `datetime` | Update timestamp |
+
+Unique index on `[authenticatable_type, authenticatable_id, method]`.
+
+## Security Notes
+
+- **TOTP secrets** are stored using Rails Active Record Encryption
+- **Backup code digests** are stored as SHA-256 hashes; plain-text codes are shown once
+- **SMS codes** are stored as digests with a 5-minute expiry
+- TOTP verification allows a 30-second drift to accommodate clock differences
+- Backup codes are consumed on use (one-time only)
+- All comparisons use timing-safe operations

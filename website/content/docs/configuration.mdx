@@ -1,0 +1,113 @@
+---
+title: Configuration
+description: Global configuration options for Custos
+---
+
+# Configuration
+
+Custos provides a global configuration that applies across all models. Configure it in your initializer.
+
+## Setup
+
+The install generator creates `config/initializers/custos.rb`:
+
+```ruby
+Custos.configure do |config|
+  config.session_expiry = 24 * 60 * 60
+  config.session_renewal_interval = 60 * 60
+  config.token_length = 32
+  config.scope_map = { user: "User", api_client: "ApiClient" }
+end
+```
+
+## Options
+
+### `session_expiry`
+
+How long a session remains valid (in seconds). After this period, sessions are considered expired regardless of activity.
+
+| | |
+|---|---|
+| **Type** | `Integer` |
+| **Default** | `86400` (24 hours) |
+| **Unit** | Seconds |
+
+```ruby
+config.session_expiry = 7 * 24 * 60 * 60 # 7 days
+```
+
+### `session_renewal_interval`
+
+How often `last_active_at` is updated on the session record. This avoids writing to the database on every single request while still tracking activity.
+
+| | |
+|---|---|
+| **Type** | `Integer` |
+| **Default** | `3600` (1 hour) |
+| **Unit** | Seconds |
+
+```ruby
+config.session_renewal_interval = 15 * 60 # 15 minutes
+```
+
+### `token_length`
+
+The byte length for generated tokens (session tokens, magic link tokens, API tokens, remember tokens). The resulting Base64 string will be longer than this value.
+
+| | |
+|---|---|
+| **Type** | `Integer` |
+| **Default** | `32` |
+| **Unit** | Bytes |
+
+32 bytes provides 256 bits of entropy, which is considered secure for authentication tokens.
+
+```ruby
+config.token_length = 48 # 384 bits of entropy
+```
+
+### `scope_map`
+
+Maps scope names (used in controller helpers) to model class names. Only scopes listed in the map are recognized -- unlisted scopes return `nil` (whitelist-only).
+
+| | |
+|---|---|
+| **Type** | `Hash` |
+| **Default** | `{}` (empty, uses inference) |
+
+```ruby
+config.scope_map = { user: "User", api_client: "ApiClient" }
+```
+
+When configured, `custos_current(scope: :user)` only returns records where `authenticatable_type` matches `"User"`.
+
+## Accessing Configuration
+
+You can read the current configuration at runtime:
+
+```ruby
+Custos.configuration.session_expiry
+# => 86400
+
+Custos.configuration.token_length
+# => 32
+```
+
+## Per-Model Configuration
+
+Plugin-level settings are configured per-model inside the `custos` block, not in the global initializer. See each plugin's documentation for available options:
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    # Plugin-specific options
+    plugin :password, min_length: 12, require_uppercase: true
+    plugin :lockout, max_attempts: 5, lockout_duration: 60 * 60
+    plugin :remember_me, remember_duration: 14 * 24 * 60 * 60
+  end
+end
+```
+
+This separation keeps global concerns (session behavior, token entropy) in the initializer and feature-specific settings on the model where they apply.

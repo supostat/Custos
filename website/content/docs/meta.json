@@ -1,0 +1,17 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---Getting Started---",
+    "index",
+    "getting-started",
+    "configuration",
+    "---Features---",
+    "...plugins",
+    "session-management",
+    "---Integration---",
+    "generators",
+    "mailer-integration",
+    "---More---",
+    "example-app"
+  ]
+}

@@ -1,0 +1,180 @@
+---
+title: Email Confirmation
+description: Email verification during registration
+---
+
+# Email Confirmation Plugin
+
+The Email Confirmation plugin requires users to verify their email address after registration. It generates a confirmation token, fires a callback so you can send the email, and provides a method to confirm.
+
+## Setup
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :email_confirmation
+
+    on(:email_confirmation_requested) do |record, token|
+      AuthMailer.confirm_email(record, token).deliver_later
+    end
+  end
+end
+```
+
+Run the model generator:
+
+```bash
+rails generate custos:model User email_confirmation
+rails db:migrate
+```
+
+This adds `email_confirmed_at`, `email_confirmation_token_digest`, and `email_confirmation_sent_at` columns to your model's table.
+
+## Instance Methods
+
+### `send_email_confirmation`
+
+Generates a confirmation token, stores its digest, records the send timestamp, and fires the `:email_confirmation_requested` callback. Returns the plain-text token.
+
+```ruby
+token = user.send_email_confirmation
+# => "aBcDeFgHiJ..." (fires :email_confirmation_requested callback)
+```
+
+### `confirm_email!(token)`
+
+Verifies the confirmation token using timing-safe comparison. On success, sets `email_confirmed_at` and clears the token digest. Returns `true` or `false`.
+
+```ruby
+user.confirm_email!("aBcDeFgHiJ...")
+# => true
+
+user.email_confirmed?
+# => true
+```
+
+### `email_confirmed?`
+
+Returns whether the user has confirmed their email address.
+
+```ruby
+user.email_confirmed?
+# => false (before confirmation)
+# => true (after confirmation)
+```
+
+## Controller Example
+
+### Registration with Confirmation
+
+```ruby
+class RegistrationsController < ApplicationController
+  def create
+    user = User.new(user_params)
+    user.password = params[:password]
+
+    if user.save
+      user.send_email_confirmation
+      redirect_to root_path, notice: "Please check your email to confirm your account."
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+end
+```
+
+### Confirming Email
+
+```ruby
+class EmailConfirmationsController < ApplicationController
+  def show
+    user = User.find(params[:user_id])
+
+    if user.confirm_email!(params[:token])
+      redirect_to sign_in_path, notice: "Email confirmed! You can now sign in."
+    else
+      redirect_to root_path, alert: "Invalid or expired confirmation link."
+    end
+  end
+end
+```
+
+### Resending Confirmation
+
+```ruby
+class EmailConfirmationsController < ApplicationController
+  def create
+    user = User.find_by(email: params[:email])
+    user&.send_email_confirmation unless user&.email_confirmed?
+    # Always show generic message
+    redirect_to root_path, notice: "If that email exists, a confirmation link has been sent."
+  end
+end
+```
+
+### Restricting Unconfirmed Users
+
+```ruby
+class ApplicationController < ActionController::Base
+  private
+
+  def require_confirmed_email
+    return if custos_current&.email_confirmed?
+
+    redirect_to root_path, alert: "Please confirm your email address."
+  end
+end
+
+class DashboardController < ApplicationController
+  before_action :custos_authenticate!
+  before_action :require_confirmed_email
+
+  def show
+    @user = custos_current
+  end
+end
+```
+
+## Mailer Example
+
+```ruby
+class AuthMailer < ApplicationMailer
+  def confirm_email(user, token)
+    @user = user
+    @url = email_confirmation_url(user_id: user.id, token: token)
+    mail(to: user.email, subject: "Confirm your email address")
+  end
+end
+```
+
+## Database Columns
+
+Added to your model's table:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `email_confirmed_at` | `datetime` | Set when email is confirmed |
+| `email_confirmation_token_digest` | `string` | SHA-256 digest of the token |
+| `email_confirmation_sent_at` | `datetime` | When the confirmation was last sent |
+
+## Configuration Options
+
+```ruby
+custos do
+  plugin :email_confirmation, confirmation_expiry: 48 * 60 * 60  # 48 hours
+end
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `confirmation_expiry` | `Integer` | `86400` (24 hours) | How long the confirmation token remains valid (in seconds) |
+
+## Security Notes
+
+- The confirmation token is stored as a **SHA-256 digest**; the plain-text token is returned once
+- Token verification uses `ActiveSupport::SecurityUtils.secure_compare` (timing-safe)
+- The token digest is cleared after successful confirmation, preventing reuse
+- Tokens expire after `confirmation_expiry` (default: 24 hours)
+- Always show generic responses to prevent email enumeration

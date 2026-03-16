@@ -1,0 +1,118 @@
+---
+title: Plugin System
+description: How Custos plugins work and how to combine them
+---
+
+# Plugin System
+
+Every feature in Custos is a plugin. Plugins are registered modules that add methods, associations, and validations to your model when activated.
+
+## How Plugins Work
+
+Each plugin is a Ruby module with an `apply` class method. When you call `plugin :name` inside a `custos` block, Custos:
+
+1. Looks up the plugin in the registry
+2. Calls `apply(model_class, **options)` with any options you passed
+3. The plugin includes instance methods, extends class methods, and sets up associations
+
+```ruby
+module Custos
+  module Plugins
+    module Password
+      def self.apply(model_class, **options)
+        model_class.include(InstanceMethods)
+        model_class.extend(ClassMethods)
+        # set up validations based on options...
+      end
+
+      module InstanceMethods
+        def authenticate_password(plain_password)
+          # ...
+        end
+      end
+
+      module ClassMethods
+        def find_by_email_and_password(email:, password:)
+          # ...
+        end
+      end
+    end
+  end
+end
+
+Custos::Plugin.register(:password, Custos::Plugins::Password)
+```
+
+## Plugin Registry
+
+All plugins are registered at load time via `Custos::Plugin.register`. You can inspect what's available:
+
+```ruby
+Custos::Plugin.registered_names
+# => [:password, :magic_link, :api_tokens, :mfa, :lockout, :email_confirmation, :remember_me]
+
+Custos::Plugin.registered?(:password)
+# => true
+```
+
+## Combining Plugins
+
+Plugins are independent. You can combine any number of them on a single model:
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :password
+    plugin :magic_link
+    plugin :mfa
+    plugin :lockout
+    plugin :email_confirmation
+    plugin :remember_me
+  end
+end
+```
+
+Or use a minimal set:
+
+```ruby
+class ApiClient < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :api_tokens
+  end
+end
+```
+
+## Plugin Interactions
+
+Some plugins are aware of each other:
+
+- **Password + Lockout**: When both are enabled, the Password plugin automatically calls `record_failed_attempt!` on failed authentication and `reset_failed_attempts!` on success.
+- **All other combinations** are fully independent.
+
+## Checking Enabled Plugins
+
+You can query which plugins are active on a model:
+
+```ruby
+User.custos_config.plugin_enabled?(:password)
+# => true
+
+User.custos_config.loaded_plugins
+# => { password: {}, magic_link: {}, mfa: {} }
+```
+
+## Available Plugins
+
+| Plugin | Description | Dependencies |
+|--------|-------------|-------------|
+| [Password](/docs/plugins/password) | Email + password with Argon2 | `argon2` gem |
+| [Magic Link](/docs/plugins/magic-link) | Passwordless email links | None |
+| [API Tokens](/docs/plugins/api-tokens) | Bearer token auth | None |
+| [MFA](/docs/plugins/mfa) | TOTP, backup codes, SMS | `rotp` gem |
+| [Lockout](/docs/plugins/lockout) | Failed attempt lockout | None |
+| [Email Confirmation](/docs/plugins/email-confirmation) | Email verification | None |
+| [Remember Me](/docs/plugins/remember-me) | Persistent sessions | None |

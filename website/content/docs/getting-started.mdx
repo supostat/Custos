@@ -1,0 +1,169 @@
+---
+title: Getting Started
+description: Install Custos and set up authentication in your Rails app
+---
+
+# Getting Started
+
+This guide walks you through installing Custos, running the generators, and authenticating your first user.
+
+## Installation
+
+Add Custos to your `Gemfile`:
+
+```ruby
+gem "custos"
+```
+
+Then install:
+
+```bash
+bundle install
+```
+
+## Run the Install Generator
+
+The install generator creates the global configuration file and the sessions migration:
+
+```bash
+rails generate custos:install
+```
+
+This produces:
+
+- `config/initializers/custos.rb` -- global configuration
+- `db/migrate/TIMESTAMP_create_custos_sessions.rb` -- the sessions table
+
+Run the migration:
+
+```bash
+rails db:migrate
+```
+
+## Configure Your Model
+
+Use the model generator to add authentication columns and tables for your chosen plugins:
+
+```bash
+rails generate custos:model User password magic_link lockout email_confirmation
+```
+
+This creates migrations for:
+
+- `password_digest`, `failed_auth_count`, `locked_at`, `email_confirmed_at`, `email_confirmation_token_digest`, `email_confirmation_sent_at` columns on the `users` table
+- `custos_magic_links` table
+
+Run the migrations:
+
+```bash
+rails db:migrate
+```
+
+Then include the concern and configure plugins in your model:
+
+```ruby
+class User < ApplicationRecord
+  include Custos::Authenticatable
+
+  custos do
+    plugin :password, min_length: 10, require_digit: true
+    plugin :magic_link
+    plugin :lockout, max_attempts: 5
+    plugin :email_confirmation
+
+    on(:magic_link_created) do |record, token|
+      AuthMailer.magic_link(record, token).deliver_later
+    end
+
+    on(:email_confirmation_requested) do |record, token|
+      AuthMailer.confirm_email(record, token).deliver_later
+    end
+  end
+end
+```
+
+## Global Configuration
+
+Customize session behavior in the initializer:
+
+```ruby
+# config/initializers/custos.rb
+Custos.configure do |config|
+  config.session_expiry = 24 * 60 * 60           # 24 hours (seconds)
+  config.session_renewal_interval = 60 * 60       # 1 hour (seconds)
+  config.token_length = 32                        # bytes
+end
+```
+
+## Authenticate in Controllers
+
+Custos automatically includes `ControllerHelpers` in all controllers via a Railtie. You get three helper methods:
+
+```ruby
+class DashboardController < ApplicationController
+  before_action :custos_authenticate!
+
+  def show
+    @user = custos_current # returns the authenticated user
+  end
+end
+```
+
+```ruby
+class SessionsController < ApplicationController
+  def create
+    user = User.find_by_email_and_password(
+      email: params[:email],
+      password: params[:password]
+    )
+
+    if user
+      session, token = Custos::SessionManager.create(user, request: request)
+      cookies.signed[:custos_session_token] = {
+        value: token,
+        httponly: true,
+        secure: Rails.env.production?
+      }
+      redirect_to dashboard_path
+    else
+      flash[:alert] = "Invalid email or password"
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    custos_session&.then { |s| Custos::SessionManager.revoke(s) }
+    cookies.delete(:custos_session_token)
+    redirect_to root_path
+  end
+end
+```
+
+## Controller Helpers Reference
+
+| Helper | Description |
+|--------|-------------|
+| `custos_authenticate!(scope:)` | Raises `Custos::NotAuthenticatedError` if not authenticated |
+| `custos_authenticated?(scope:)` | Returns `true` if the current request is authenticated |
+| `custos_current(scope:)` | Returns the authenticated record (e.g., `User`) or `nil` |
+| `custos_session` | Returns the current `Custos::Session` record or `nil` |
+
+The `scope` parameter defaults to `:user`. Use it when you have multiple authenticatable models:
+
+```ruby
+custos_current(scope: :api_client) # looks up an ApiClient
+```
+
+## Token Extraction
+
+Custos extracts the session token from two sources, checked in order:
+
+1. **Signed cookie** -- `cookies.signed[:custos_session_token]` (for web apps)
+2. **Authorization header** -- `Authorization: Bearer <token>` (for APIs)
+
+## Next Steps
+
+- [Configuration](/docs/configuration) -- all global options
+- [Plugins](/docs/plugins) -- detailed guide for each plugin
+- [Session Management](/docs/session-management) -- revoke sessions, device tracking
+- [Mailer Integration](/docs/mailer-integration) -- connect your email delivery

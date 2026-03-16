@@ -1,0 +1,13 @@
+{
+  "title": "Plugins",
+  "pages": [
+    "index",
+    "password",
+    "magic-link",
+    "api-tokens",
+    "mfa",
+    "lockout",
+    "email-confirmation",
+    "remember-me"
+  ]
+}
