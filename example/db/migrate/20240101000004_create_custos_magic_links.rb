@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+class CreateCustosMagicLinks < ActiveRecord::Migration[7.1]
+  def change
+    create_table :custos_magic_links do |t|
+      t.string :authenticatable_type, null: false
+      t.bigint :authenticatable_id, null: false
+      t.string :token_digest, null: false
+      t.datetime :expires_at, null: false
+      t.datetime :used_at
+
+      t.datetime :created_at, null: false
+    end
+
+    add_index :custos_magic_links, :token_digest, unique: true
+    add_index :custos_magic_links, %i[authenticatable_type authenticatable_id],
+              name: "index_custos_magic_links_on_authenticatable"
+  end
+end

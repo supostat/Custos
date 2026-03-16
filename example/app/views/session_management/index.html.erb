@@ -1,0 +1,45 @@
+<div class="card">
+  <div class="flex-between mb-16">
+    <h1>Active Sessions</h1>
+    <%= button_to "Revoke All", revoke_all_session_management_index_path, method: :delete, class: "btn btn-danger btn-sm" %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>User Agent</th>
+        <th>Last Active</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @sessions.each do |sess| %>
+        <tr>
+          <td><span class="mono"><%= sess.ip_address || "unknown" %></span></td>
+          <td class="text-muted"><%= truncate(sess.user_agent || "unknown", length: 60) %></td>
+          <td class="text-muted"><%= time_ago_in_words(sess.last_active_at) %> ago</td>
+          <td>
+            <% if @current_session && sess.id == @current_session.id %>
+              <span class="current-badge">current</span>
+            <% else %>
+              <%= button_to "Revoke", session_management_path(sess), method: :delete, class: "btn btn-danger btn-sm" %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <% if @sessions.empty? %>
+    <p class="text-center text-muted mt-16">No active sessions.</p>
+  <% end %>
+</div>
+
+<div class="card">
+  <h2>Account Info</h2>
+  <p><strong>Email:</strong> <%= current_user.email %></p>
+  <p><strong>Email confirmed:</strong> <%= current_user.email_confirmed? ? "Yes" : "No" %></p>
+  <p><strong>MFA enabled:</strong> <%= current_user.mfa_enabled? ? "Yes" : "No" %></p>
+  <p><strong>Locked:</strong> <%= current_user.locked? ? "Yes" : "No" %></p>
+</div>

@@ -1,0 +1,31 @@
+<div class="card">
+  <h1>Two-Factor Authentication</h1>
+  <p class="text-muted mb-16">Enter your TOTP code or a backup code.</p>
+
+  <%= form_with(url: mfa_verify_path, method: :post) do %>
+    <div>
+      <label for="code">Code</label>
+      <input type="text" name="code" id="code" required autocomplete="off" inputmode="numeric" maxlength="8">
+    </div>
+    <input type="submit" value="Verify">
+  <% end %>
+
+  <hr>
+
+  <p class="text-muted mb-8">Or verify via SMS:</p>
+  <%= form_with(url: mfa_send_sms_path, method: :post) do %>
+    <input type="submit" value="Send SMS Code" class="btn btn-secondary btn-sm">
+  <% end %>
+
+  <% if flash[:notice]&.include?("SMS") %>
+    <div class="mt-16">
+      <%= form_with(url: mfa_verify_sms_path, method: :post) do %>
+        <div>
+          <label for="sms_code">SMS Code</label>
+          <input type="text" name="code" id="sms_code" required autocomplete="off" inputmode="numeric" pattern="[0-9]{6}" maxlength="6">
+        </div>
+        <input type="submit" value="Verify SMS">
+      <% end %>
+    </div>
+  <% end %>
+</div>

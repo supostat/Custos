@@ -1,0 +1,37 @@
+<div class="card">
+  <h1>MFA Setup</h1>
+
+  <h2>TOTP (Authenticator App)</h2>
+  <p class="text-muted mb-8">
+    Add this to your authenticator app (Google Authenticator, Authy, etc.):
+  </p>
+  <div class="code-block"><%= @provisioning_uri %></div>
+
+  <p class="text-muted mb-16">
+    Enter the 6-digit code from your authenticator app to confirm setup:
+  </p>
+
+  <%= form_with(url: mfa_confirm_totp_path, method: :post) do %>
+    <div>
+      <label for="code">TOTP Code</label>
+      <input type="text" name="code" id="code" required autocomplete="off" inputmode="numeric" pattern="[0-9]{6}" maxlength="6">
+    </div>
+    <input type="submit" value="Enable TOTP">
+  <% end %>
+
+  <hr>
+
+  <h2>Backup Codes</h2>
+  <p class="text-muted mb-8">Generate one-time backup codes in case you lose your authenticator.</p>
+  <%= form_with(url: mfa_backup_codes_path, method: :post) do %>
+    <input type="submit" value="Generate Backup Codes" class="btn btn-secondary">
+  <% end %>
+
+  <hr>
+
+  <h2>SMS Verification</h2>
+  <p class="text-muted mb-8">Send a verification code to your phone number on file.</p>
+  <%= form_with(url: mfa_send_sms_path, method: :post) do %>
+    <input type="submit" value="Send SMS Code" class="btn btn-secondary">
+  <% end %>
+</div>

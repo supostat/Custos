@@ -1,0 +1,29 @@
+<div class="card">
+  <h1>Sign In</h1>
+
+  <%= form_with(url: session_path, method: :post) do %>
+    <div>
+      <label for="email">Email</label>
+      <input type="email" name="email" id="email" required>
+    </div>
+
+    <div>
+      <label for="password">Password</label>
+      <input type="password" name="password" id="password" required>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" name="remember_me" id="remember_me" value="1">
+      <label for="remember_me">Remember me</label>
+    </div>
+
+    <input type="submit" value="Sign In">
+  <% end %>
+
+  <hr>
+  <p class="text-center text-muted">
+    <a href="<%= magic_link_request_path %>">Sign in with magic link</a>
+    &middot;
+    <a href="<%= new_registration_path %>">Create account</a>
+  </p>
+</div>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Custos Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+    .container { max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    .card { background: #fff; border-radius: 8px; padding: 32px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h1 { font-size: 24px; margin-bottom: 20px; }
+    h2 { font-size: 18px; margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+    input[type="text"], input[type="email"], input[type="password"], input[type="tel"] {
+      width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+    }
+    input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+      outline: none; border-color: #4a90d9; box-shadow: 0 0 0 3px rgba(74,144,217,0.15);
+    }
+    button, input[type="submit"], .btn {
+      display: inline-block; padding: 10px 20px; background: #4a90d9; color: #fff; border: none;
+      border-radius: 6px; font-size: 14px; cursor: pointer; text-decoration: none; font-weight: 600;
+    }
+    button:hover, input[type="submit"]:hover, .btn:hover { background: #357abd; }
+    .btn-danger { background: #d9534f; }
+    .btn-danger:hover { background: #c9302c; }
+    .btn-secondary { background: #6c757d; }
+    .btn-secondary:hover { background: #5a6268; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .flash { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+    .flash-notice { background: #d4edda; color: #155724; }
+    .flash-alert { background: #f8d7da; color: #721c24; }
+    .errors { background: #f8d7da; color: #721c24; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; }
+    .errors ul { margin-left: 20px; }
+    .nav { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+    .nav a { color: #4a90d9; text-decoration: none; font-size: 14px; }
+    .nav a:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { font-weight: 600; background: #f9f9f9; }
+    .current-badge { background: #28a745; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .mono { font-family: "SF Mono", "Consolas", monospace; font-size: 13px; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+    .code-block { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 13px; overflow-x: auto; margin: 12px 0; word-break: break-all; }
+    .mb-8 { margin-bottom: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+    .mt-16 { margin-top: 16px; }
+    .text-center { text-align: center; }
+    .text-muted { color: #888; font-size: 13px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .checkbox-row input[type="checkbox"] { margin: 0; }
+    .checkbox-row label { margin: 0; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <strong>Custos Example</strong>
+      <% if current_user %>
+        <a href="<%= session_management_index_path %>">Sessions</a>
+        <a href="<%= mfa_setup_path %>">MFA Setup</a>
+        <span class="text-muted"><%= current_user.email %></span>
+        <%= button_to "Sign Out", session_path, method: :delete, class: "btn btn-sm btn-secondary" %>
+      <% else %>
+        <a href="<%= new_session_path %>">Sign In</a>
+        <a href="<%= new_registration_path %>">Register</a>
+      <% end %>
+    </div>
+
+    <% if flash[:notice] %>
+      <div class="flash flash-notice"><%= flash[:notice] %></div>
+    <% end %>
+    <% if flash[:alert] %>
+      <div class="flash flash-alert"><%= flash[:alert] %></div>
+    <% end %>
+
+    <%= yield %>
+  </div>
+</body>
+</html>

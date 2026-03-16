@@ -1,0 +1,16 @@
+<div class="card">
+  <h1>Backup Codes</h1>
+  <p class="text-muted mb-16">
+    Save these codes in a secure place. Each code can only be used once.
+  </p>
+
+  <div class="code-block">
+    <% @backup_codes.each do |code| %>
+<%= code %>
+    <% end %>
+  </div>
+
+  <p class="mt-16">
+    <a href="<%= session_management_index_path %>" class="btn">Done</a>
+  </p>
+</div>

@@ -1,0 +1,37 @@
+<div class="card">
+  <h1>Register</h1>
+
+  <% if @user.errors.any? %>
+    <div class="errors">
+      <ul>
+        <% @user.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with(url: registrations_path, method: :post) do |f| %>
+    <div>
+      <label for="user_email">Email</label>
+      <input type="email" name="user[email]" id="user_email" value="<%= @user.email %>" required>
+    </div>
+
+    <div>
+      <label for="user_phone">Phone (optional, for SMS MFA)</label>
+      <input type="tel" name="user[phone]" id="user_phone" value="<%= @user.phone %>">
+    </div>
+
+    <div>
+      <label for="user_password">Password</label>
+      <input type="password" name="user[password]" id="user_password" required minlength="8">
+    </div>
+
+    <input type="submit" value="Create Account">
+  <% end %>
+
+  <hr>
+  <p class="text-center text-muted">
+    Already have an account? <a href="<%= new_session_path %>">Sign in</a>
+  </p>
+</div>
