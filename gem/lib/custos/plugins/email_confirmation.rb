@@ -22,11 +22,12 @@ module Custos
         end
 
         def confirm_email!(token)
-          return false if email_confirmation_token_digest.blank?
-          return false if confirmation_token_expired?
-
           digest = Custos::TokenGenerator.digest(token)
-          return false unless Custos::TokenGenerator.secure_compare(email_confirmation_token_digest, digest)
+          stored = email_confirmation_token_digest || ''
+
+          token_matches = Custos::TokenGenerator.secure_compare(stored, digest)
+          return false unless token_matches
+          return false if confirmation_token_expired?
 
           update!(
             email_confirmed_at: Time.current,
