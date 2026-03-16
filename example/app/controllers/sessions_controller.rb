@@ -68,6 +68,13 @@ class SessionsController < ApplicationController
     _custos_session, token = Custos::SessionManager.create(user, request: request)
     set_session_cookie(token, remember: remember)
 
+    if user.respond_to?(:record_audit_event)
+      user.record_audit_event(:session_created, metadata: {
+        ip: request.remote_ip,
+        user_agent: request.user_agent
+      })
+    end
+
     if remember && user.respond_to?(:generate_remember_token)
       remember_token = user.generate_remember_token
       cookies.signed[:custos_remember_token] = {

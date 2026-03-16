@@ -1,0 +1,29 @@
+<div class="card">
+  <div class="flex-between mb-16">
+    <h1>Audit Log</h1>
+    <%= link_to "Back to Sessions", session_management_index_path, class: "btn btn-sm" %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Event</th>
+        <th>Metadata</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @audit_logs.each do |entry| %>
+        <tr>
+          <td class="text-muted"><%= entry.created_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
+          <td><span class="mono"><%= entry.event %></span></td>
+          <td class="text-muted"><%= entry.metadata %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <% if @audit_logs.empty? %>
+    <p class="text-center text-muted mt-16">No audit events yet.</p>
+  <% end %>
+</div>

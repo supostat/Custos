@@ -7,6 +7,7 @@ class CreateCustosApiTokens < ActiveRecord::Migration[7.1]
       t.bigint :authenticatable_id, null: false
       t.string :token_digest, null: false
       t.datetime :last_used_at
+      t.datetime :expires_at
       t.datetime :revoked_at
 
       t.timestamps

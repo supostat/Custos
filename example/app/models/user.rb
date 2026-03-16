@@ -10,6 +10,7 @@ class User < ApplicationRecord
     plugin :lockout
     plugin :email_confirmation
     plugin :remember_me
+    plugin :audit_log
 
     on(:magic_link_created) do |record, token|
       AuthMailer.magic_link(record, token).deliver_later

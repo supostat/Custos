@@ -21,4 +21,14 @@ token = client.generate_api_token
 puts "  Created API client: #{client.name}"
 puts "  API token: #{token}"
 
+# Create an admin user (STI)
+admin = Admin.create!(
+  email: "admin@example.com",
+  phone: "+1987654321"
+)
+admin.password = "AdminSecure123"
+admin.save!
+admin.update!(email_confirmed_at: Time.current)
+puts "  Created admin: admin@example.com (password: AdminSecure123)"
+
 puts "Done."

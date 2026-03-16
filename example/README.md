@@ -10,6 +10,8 @@ Minimal Rails application demonstrating all Custos features:
 - Remember me
 - Session management (list, revoke, revoke all)
 - API token authentication
+- **Custom plugin: audit_log** (defined in the app, not the gem)
+- **STI: Admin < User** with stricter security config
 
 ## Setup
 
@@ -24,10 +26,34 @@ Open http://localhost:3000
 
 ## Seed Data
 
-| Model     | Email             | Password      |
-|-----------|-------------------|---------------|
-| User      | demo@example.com  | password123   |
-| ApiClient | api@example.com   | (see seed output for token) |
+| Model     | Email             | Password        | Notes                                      |
+|-----------|-------------------|-----------------|--------------------------------------------|
+| User      | demo@example.com  | password123     | All plugins enabled                        |
+| Admin     | admin@example.com | AdminSecure123  | Stricter password, tighter lockout, no magic link |
+| ApiClient | api@example.com   | (see seed output for token) |                              |
+
+## Custom Plugin: audit_log
+
+Defined in `lib/custos/plugins/audit_log.rb`, this plugin demonstrates how to extend
+Custos within your application:
+
+- Listens to `:after_authentication` and `:after_mfa_verification` hooks
+- Records events to an `audit_logs` table
+- Exposes `record_audit_event` for controllers to log custom events (e.g., session creation with IP/UA)
+- View events at `/audit_logs`
+
+## STI: Admin
+
+`Admin < User` inherits the User table via Single Table Inheritance. It defines its own
+`custos` block with stricter settings:
+
+- Password: min 12 chars, requires uppercase and digit
+- Lockout: 3 attempts, 1 hour duration (vs User defaults)
+- No magic_link or remember_me plugins
+- Has audit_log plugin
+
+Login with the admin account works through the same login form — Rails STI handles class
+resolution automatically.
 
 ## API Usage
 

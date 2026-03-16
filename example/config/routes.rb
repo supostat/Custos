@@ -26,6 +26,9 @@ Rails.application.routes.draw do
     post "verify_sms", to: "mfa#verify_sms", as: :mfa_verify_sms
   end
 
+  # Audit log
+  resources :audit_logs, only: :index
+
   # Session management
   resources :session_management, only: %i[index destroy] do
     collection do
