@@ -26,7 +26,7 @@ module Custos
 
     def custos_session
       token = extract_custos_token
-      @custos_session ||= Custos::SessionManager.find_by(token: token) if token
+      @custos_session ||= Custos::SessionManager.find_by_token(token) if token
     end
 
     private

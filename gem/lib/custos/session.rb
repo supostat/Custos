@@ -8,7 +8,7 @@ module Custos
 
     scope :active, lambda {
       where(revoked_at: nil)
-        .where('created_at > ?', Custos.configuration.session_expiry.seconds.ago)
+        .where('last_active_at > ?', Custos.configuration.session_expiry.seconds.ago)
     }
 
     scope :revoked, -> { where.not(revoked_at: nil) }

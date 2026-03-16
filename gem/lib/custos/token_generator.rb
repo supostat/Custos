@@ -24,7 +24,10 @@ module Custos
       secret = Custos.configuration.token_secret
       return secret if secret
 
-      return Rails.application.secret_key_base if defined?(Rails) && Rails.application.respond_to?(:secret_key_base)
+      if defined?(Rails) && Rails.application.respond_to?(:secret_key_base)
+        base = Rails.application.secret_key_base
+        return base if base.present?
+      end
 
       raise Custos::Error, 'Custos.configuration.token_secret must be configured'
     end

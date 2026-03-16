@@ -26,6 +26,7 @@ Metrics/BlockLength:
 Metrics/AbcSize:
   Exclude:
     - "lib/custos/mfa_encryptor.rb"
+    - "lib/custos/plugins/lockout.rb"
 
 Metrics/MethodLength:
   Max: 20
@@ -62,6 +63,14 @@ RSpec/ExampleLength:
 
 RSpec/MultipleExpectations:
   Max: 5
+
+RSpec/MultipleMemoizedHelpers:
+  Exclude:
+    - "spec/custos/controller_helpers_spec.rb"
+
+RSpec/VerifiedDoubles:
+  Exclude:
+    - "spec/custos/controller_helpers_spec.rb"
 
 RSpec/MultipleDescribes:
   Exclude:

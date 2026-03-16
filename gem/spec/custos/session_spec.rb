@@ -3,14 +3,13 @@
 RSpec.describe Custos::Session do
   let(:user) { TestUser.create!(email: 'session-model@example.com', password: 'securepass1') }
 
-  def create_session(revoked: false, created_at: Time.current)
+  def create_session(revoked: false, last_active_at: Time.current)
     session = described_class.create!(
       authenticatable: user,
       session_token_digest: Custos::TokenGenerator.digest(SecureRandom.hex),
       ip_address: '127.0.0.1',
       user_agent: 'RSpec',
-      last_active_at: Time.current,
-      created_at: created_at
+      last_active_at: last_active_at
     )
     session.update!(revoked_at: Time.current) if revoked
     session
@@ -25,7 +24,7 @@ RSpec.describe Custos::Session do
     end
 
     it 'excludes expired sessions' do
-      create_session(created_at: 25.hours.ago)
+      create_session(last_active_at: 25.hours.ago)
       active = create_session
 
       expect(described_class.active).to eq([active])

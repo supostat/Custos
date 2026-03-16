@@ -6,6 +6,8 @@ class AddCustosTo<%= model_name.camelize.pluralize %> < ActiveRecord::Migration[
 <%- if has_lockout? -%>
     add_column :<%= table_name %>, :failed_auth_count, :integer, default: 0, null: false
     add_column :<%= table_name %>, :locked_at, :datetime
+    add_column :<%= table_name %>, :failed_mfa_count, :integer, default: 0, null: false
+    add_column :<%= table_name %>, :mfa_locked_at, :datetime
 <%- end -%>
 <%- if has_email_confirmation? -%>
     add_column :<%= table_name %>, :email_confirmed_at, :datetime
