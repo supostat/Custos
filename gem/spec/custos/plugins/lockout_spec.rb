@@ -105,6 +105,34 @@ RSpec.describe Custos::Plugins::Lockout do
     end
   end
 
+  describe '#record_failed_attempt! after expired lockout' do
+    it 'resets counter when previous lockout has expired' do
+      3.times { user.record_failed_attempt! }
+      expect(user.reload.locked?).to be true
+
+      user.update_column(:locked_at, 31.minutes.ago)
+      expect(user.locked?).to be false
+
+      user.record_failed_attempt!
+      expect(user.reload.failed_auth_count).to eq(1)
+      expect(user.locked?).to be false
+    end
+  end
+
+  describe '#record_failed_mfa_attempt! after expired lockout' do
+    it 'resets MFA counter when previous lockout has expired' do
+      5.times { user.record_failed_mfa_attempt! }
+      expect(user.reload.mfa_locked?).to be true
+
+      user.update_column(:mfa_locked_at, 31.minutes.ago)
+      expect(user.mfa_locked?).to be false
+
+      user.record_failed_mfa_attempt!
+      expect(user.reload.failed_mfa_count).to eq(1)
+      expect(user.mfa_locked?).to be false
+    end
+  end
+
   describe 'integration with password' do
     it 'records failed attempt on wrong password' do
       user.authenticate_password('wrong')
