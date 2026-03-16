@@ -11,9 +11,14 @@ class SessionManagementController < ApplicationController
 
   # DELETE /session_management/:id — revoke a specific session
   def destroy
-    target_session = current_user.custos_sessions.find(params[:id])
-    Custos::SessionManager.revoke(target_session)
-    redirect_to session_management_index_path, notice: "Session revoked."
+    target_session = current_user.custos_sessions.find_by(id: params[:id])
+
+    if target_session
+      Custos::SessionManager.revoke(target_session)
+      redirect_to session_management_index_path, notice: "Session revoked."
+    else
+      redirect_to session_management_index_path, alert: "Session not found."
+    end
   end
 
   # DELETE /session_management/revoke_all — revoke all sessions

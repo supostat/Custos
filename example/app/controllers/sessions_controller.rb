@@ -49,10 +49,14 @@ class SessionsController < ApplicationController
   def verify_magic_link
     user = User.authenticate_magic_link(params[:token])
 
-    if user
-      complete_sign_in(user)
-    else
+    if user.nil?
       redirect_to new_session_path, alert: "Invalid or expired magic link."
+    elsif user.respond_to?(:locked?) && user.locked?
+      redirect_to new_session_path, alert: "Account is locked. Try again later."
+    elsif user.respond_to?(:email_confirmed?) && !user.email_confirmed?
+      redirect_to new_session_path, alert: "Please confirm your email first."
+    else
+      complete_sign_in(user)
     end
   end
 

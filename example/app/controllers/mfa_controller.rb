@@ -33,6 +33,12 @@ class MfaController < ApplicationController
     user = resolve_mfa_user
     return redirect_to new_session_path, alert: "Please sign in first." unless user
 
+    if user.phone.blank?
+      target = current_user ? mfa_setup_path : mfa_verify_path
+      redirect_to target, alert: "Phone number not configured."
+      return
+    end
+
     user.send_sms_code
 
     if current_user
@@ -49,9 +55,13 @@ class MfaController < ApplicationController
   # POST /mfa/verify — verify MFA code (TOTP or backup code)
   def verify
     user = User.find(session[:pending_mfa_user_id])
-    code = params[:code]
 
-    verified = user.verify_totp(code) || user.verify_backup_code(code)
+    if user.respond_to?(:mfa_locked?) && user.mfa_locked?
+      redirect_to new_session_path, alert: "Too many failed attempts. Try again later."
+      return
+    end
+
+    verified = user.verify_totp(params[:code]) || user.verify_backup_code(params[:code])
 
     if verified
       complete_mfa_sign_in(user)
@@ -64,6 +74,11 @@ class MfaController < ApplicationController
   # POST /mfa/verify_sms — verify SMS code during login
   def verify_sms
     user = User.find(session[:pending_mfa_user_id])
+
+    if user.respond_to?(:mfa_locked?) && user.mfa_locked?
+      redirect_to new_session_path, alert: "Too many failed attempts. Try again later."
+      return
+    end
 
     if user.verify_sms_code(params[:code])
       complete_mfa_sign_in(user)
@@ -78,6 +93,8 @@ class MfaController < ApplicationController
   def require_pending_mfa_user
     unless session[:pending_mfa_user_id].present? && mfa_session_fresh?
       session.delete(:pending_mfa_user_id)
+      session.delete(:pending_mfa_at)
+      session.delete(:remember_me)
       redirect_to new_session_path, alert: "Please sign in first."
     end
   end
