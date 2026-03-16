@@ -91,10 +91,8 @@ class MfaController < ApplicationController
   private
 
   def require_pending_mfa_user
-    unless session[:pending_mfa_user_id].present? && mfa_session_fresh?
-      session.delete(:pending_mfa_user_id)
-      session.delete(:pending_mfa_at)
-      session.delete(:remember_me)
+    unless session[:pending_mfa_user_id].present? && session[:pending_mfa_nonce].present? && mfa_session_fresh?
+      clear_pending_mfa_session
       redirect_to new_session_path, alert: "Please sign in first."
     end
   end
@@ -102,6 +100,13 @@ class MfaController < ApplicationController
   def mfa_session_fresh?
     pending_at = session[:pending_mfa_at]
     pending_at.present? && Time.current.to_i - pending_at.to_i < 300
+  end
+
+  def clear_pending_mfa_session
+    session.delete(:pending_mfa_user_id)
+    session.delete(:pending_mfa_at)
+    session.delete(:pending_mfa_nonce)
+    session.delete(:remember_me)
   end
 
   def resolve_mfa_user

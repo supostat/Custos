@@ -21,6 +21,7 @@ class SessionsController < ApplicationController
       reset_session
       session[:pending_mfa_user_id] = user.id
       session[:pending_mfa_at] = Time.current.to_i
+      session[:pending_mfa_nonce] = SecureRandom.hex(16)
       session[:remember_me] = params[:remember_me]
       redirect_to mfa_verify_path
       return
