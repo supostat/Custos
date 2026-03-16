@@ -29,8 +29,13 @@ module Custos
           token
         end
 
-        def forget_me!
-          custos_remember_tokens.destroy_all
+        def forget_me!(token = nil)
+          if token
+            digest = Custos::TokenGenerator.digest(token)
+            custos_remember_tokens.where(token_digest: digest).destroy_all
+          else
+            custos_remember_tokens.destroy_all
+          end
         end
       end
 

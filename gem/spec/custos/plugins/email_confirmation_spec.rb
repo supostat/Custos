@@ -50,6 +50,15 @@ RSpec.describe Custos::Plugins::EmailConfirmation do
 
       expect(user.confirm_email!(token)).to be false
     end
+
+    it 'fires email_confirmed callback' do
+      callback_user = nil
+      TestUser.custos_config.on(:email_confirmed) { |u| callback_user = u }
+
+      token = user.send_email_confirmation
+      user.confirm_email!(token)
+      expect(callback_user).to eq(user)
+    end
   end
 
   describe '#email_confirmed?' do

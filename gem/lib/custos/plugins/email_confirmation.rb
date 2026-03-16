@@ -32,6 +32,8 @@ module Custos
             email_confirmed_at: Time.current,
             email_confirmation_token_digest: nil
           )
+
+          Custos::CallbackRegistry.fire(self.class, :email_confirmed, self)
           true
         end
 

@@ -41,12 +41,20 @@ RSpec.describe Custos::Plugins::RememberMe do
   end
 
   describe '#forget_me!' do
-    it 'destroys all remember tokens' do
+    it 'destroys all remember tokens when called without argument' do
       user.generate_remember_token
       user.generate_remember_token
       user.forget_me!
 
       expect(user.custos_remember_tokens).to be_empty
+    end
+
+    it 'destroys only the specified token when called with token' do
+      token1 = user.generate_remember_token
+      user.generate_remember_token
+
+      user.forget_me!(token1)
+      expect(user.custos_remember_tokens.count).to eq(1)
     end
   end
 end
