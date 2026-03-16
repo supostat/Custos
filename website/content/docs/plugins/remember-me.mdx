@@ -51,12 +51,13 @@ token = user.generate_remember_token
 # => "xYzAbC123..." (store in a persistent cookie)
 ```
 
-### `forget_me!`
+### `forget_me!(token = nil)`
 
-Destroys all remember tokens for the user. Call this on explicit sign-out.
+Destroys remember tokens for the user. Without arguments, destroys all tokens (sign out everywhere). With a token, destroys only the matching one (sign out from a single device).
 
 ```ruby
-user.forget_me!
+user.forget_me!          # destroy all tokens
+user.forget_me!(token)   # destroy a specific token
 ```
 
 ### `custos_remember_tokens`
@@ -162,13 +163,13 @@ end
 | `id` | `bigint` | Primary key |
 | `authenticatable_type` | `string` | Polymorphic type |
 | `authenticatable_id` | `bigint` | Polymorphic ID |
-| `token_digest` | `string` | SHA-256 digest, unique index |
+| `token_digest` | `string` | HMAC-SHA256 digest, unique index |
 | `expires_at` | `datetime` | When the token expires |
 | `created_at` | `datetime` | Creation timestamp |
 
 ## Security Notes
 
-- Only the **SHA-256 digest** is stored; the plain-text token is set in a cookie once
+- Only the **HMAC-SHA256 digest** is stored; the plain-text token is set in a cookie once
 - Tokens have an explicit expiry (`expires_at`) checked server-side
 - `forget_me!` destroys all tokens, effectively signing out from all remembered sessions
 - The cookie should always be set with `httponly: true` and `secure: true` in production

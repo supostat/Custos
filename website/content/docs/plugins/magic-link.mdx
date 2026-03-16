@@ -120,14 +120,14 @@ end
 | `id` | `bigint` | Primary key |
 | `authenticatable_type` | `string` | Polymorphic type |
 | `authenticatable_id` | `bigint` | Polymorphic ID |
-| `token_digest` | `string` | SHA-256 digest, unique index |
+| `token_digest` | `string` | HMAC-SHA256 digest, unique index |
 | `expires_at` | `datetime` | When the token expires |
 | `used_at` | `datetime` | Set when token is consumed |
 | `created_at` | `datetime` | Creation timestamp |
 
 ## Security Notes
 
-- Only the **SHA-256 digest** of the token is stored in the database
+- Only the **HMAC-SHA256 digest** of the token is stored in the database
 - Tokens are single-use: once verified, they are marked as used and cannot be reused
 - Default expiry is 15 minutes
 - The `generate_magic_link` method returns `nil` for nonexistent emails, but the controller should always show a generic success message to prevent email enumeration

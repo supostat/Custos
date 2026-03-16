@@ -45,7 +45,7 @@ token = user.send_email_confirmation
 
 ### `confirm_email!(token)`
 
-Verifies the confirmation token using timing-safe comparison. On success, sets `email_confirmed_at` and clears the token digest. Returns `true` or `false`.
+Verifies the confirmation token using timing-safe comparison. On success, sets `email_confirmed_at`, clears the token digest, and fires the `:email_confirmed` callback. Returns `true` or `false`.
 
 ```ruby
 user.confirm_email!("aBcDeFgHiJ...")
@@ -156,7 +156,7 @@ Added to your model's table:
 | Column | Type | Notes |
 |--------|------|-------|
 | `email_confirmed_at` | `datetime` | Set when email is confirmed |
-| `email_confirmation_token_digest` | `string` | SHA-256 digest of the token |
+| `email_confirmation_token_digest` | `string` | HMAC-SHA256 digest of the token |
 | `email_confirmation_sent_at` | `datetime` | When the confirmation was last sent |
 
 ## Configuration Options
@@ -173,7 +173,7 @@ end
 
 ## Security Notes
 
-- The confirmation token is stored as a **SHA-256 digest**; the plain-text token is returned once
+- The confirmation token is stored as a **HMAC-SHA256 digest**; the plain-text token is returned once
 - Token verification uses `ActiveSupport::SecurityUtils.secure_compare` (timing-safe)
 - The token digest is cleared after successful confirmation, preventing reuse
 - Tokens expire after `confirmation_expiry` (default: 24 hours)

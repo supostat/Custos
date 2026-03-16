@@ -43,6 +43,7 @@ When a plugin fires an event, the `CallbackRegistry` finds all registered callba
 |-------|----------|-----------|---------|
 | `:magic_link_created` | Magic Link plugin | `(record, token)` | Send the magic link email |
 | `:email_confirmation_requested` | Email Confirmation plugin | `(record, token)` | Send the confirmation email |
+| `:email_confirmed` | Email Confirmation plugin | `(record)` | Email successfully confirmed |
 | `:sms_code_created` | MFA plugin (SMS) | `(record, code)` | Send the SMS verification code |
 
 ### Argument Details
@@ -156,6 +157,18 @@ Custos::CallbackRegistry.fire(User, :magic_link_created, user, token)
 ```
 
 This looks up `User.custos_config.callbacks[:magic_link_created]` and calls each registered block with the provided arguments.
+
+## Error Handling
+
+By default, callback errors are logged and execution continues (`:log` strategy). You can change this behavior globally:
+
+```ruby
+Custos.configure do |config|
+  config.callback_error_strategy = :raise  # raise errors instead of logging
+end
+```
+
+See [Configuration](/docs/configuration) for details.
 
 ## Testing Callbacks
 

@@ -30,7 +30,7 @@ This creates the `custos_api_tokens` table.
 
 ## Instance Methods
 
-### `generate_api_token`
+### `generate_api_token(expires_in: nil)`
 
 Creates a new API token for the record. Returns the plain-text token. This is the **only time** the plain-text token is available -- store or display it immediately.
 
@@ -38,6 +38,17 @@ Creates a new API token for the record. Returns the plain-text token. This is th
 api_client = ApiClient.find(1)
 token = api_client.generate_api_token
 # => "xYz123AbC..." (show this to the user once)
+
+# With expiration
+token = api_client.generate_api_token(expires_in: 30 * 24 * 60 * 60)  # 30 days
+```
+
+You can also set a default expiry in the plugin options:
+
+```ruby
+custos do
+  plugin :api_tokens, default_expiry: 90 * 24 * 60 * 60  # 90 days
+end
 ```
 
 ### `custos_api_tokens`
@@ -154,15 +165,16 @@ curl -H "Authorization: Bearer xYz123AbC..." https://api.example.com/resource
 | `id` | `bigint` | Primary key |
 | `authenticatable_type` | `string` | Polymorphic type |
 | `authenticatable_id` | `bigint` | Polymorphic ID |
-| `token_digest` | `string` | SHA-256 digest, unique index |
+| `token_digest` | `string` | HMAC-SHA256 digest, unique index |
 | `last_used_at` | `datetime` | Updated on each authentication |
+| `expires_at` | `datetime` | Optional token expiration |
 | `revoked_at` | `datetime` | Set when token is revoked |
 | `created_at` | `datetime` | Creation timestamp |
 | `updated_at` | `datetime` | Update timestamp |
 
 ## Security Notes
 
-- Only the **SHA-256 digest** is stored; the plain-text token is returned once at creation
+- Only the **HMAC-SHA256 digest** is stored; the plain-text token is returned once at creation
 - Revoked tokens are permanently invalidated
 - `last_used_at` is tracked for auditing
 - Token verification uses `ActiveSupport::SecurityUtils.secure_compare` for timing-safe comparison

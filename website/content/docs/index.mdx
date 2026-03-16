@@ -74,7 +74,7 @@ end
 Custos is built with security as the top priority:
 
 - **Argon2id** for password hashing (resistant to GPU/ASIC attacks)
-- **SHA-256 token digests** stored in the database; plain-text tokens are never persisted
+- **HMAC-SHA256 token digests** stored in the database; plain-text tokens are never persisted
 - **Timing-safe comparisons** via `ActiveSupport::SecurityUtils.secure_compare`
-- **Encrypted MFA secrets** using Rails Active Record Encryption
+- **Encrypted MFA secrets** using AES-256-GCM (via `Custos::MfaEncryptor`)
 - **256-bit entropy** session tokens (`SecureRandom.urlsafe_base64(32)`)

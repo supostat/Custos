@@ -27,7 +27,7 @@ rails generate custos:model User password lockout
 rails db:migrate
 ```
 
-This adds `failed_auth_count` and `locked_at` columns to your model's table.
+This adds `failed_auth_count`, `locked_at`, `failed_mfa_count`, and `mfa_locked_at` columns to your model's table.
 
 ## Configuration Options
 
@@ -153,17 +153,46 @@ class SessionsController < ApplicationController
 end
 ```
 
+## MFA Lockout
+
+When both Lockout and [MFA](/docs/plugins/mfa) plugins are enabled, failed MFA attempts are tracked independently via the `:after_mfa_verification` hook.
+
+```ruby
+custos do
+  plugin :mfa
+  plugin :lockout,
+    max_attempts: 5,
+    max_mfa_attempts: 5,
+    mfa_lockout_duration: 15 * 60  # 15 minutes
+end
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `max_mfa_attempts` | `Integer` | `5` | Failed MFA attempts before lockout |
+| `mfa_lockout_duration` | `Integer` | Same as `lockout_duration` | MFA lockout duration in seconds |
+
+### MFA Instance Methods
+
+- `mfa_locked?` -- returns `true` if MFA is currently locked
+- `record_failed_mfa_attempt!` -- increments the MFA failure counter atomically
+- `reset_failed_mfa_attempts!` -- resets the MFA counter on successful verification
+
 ## Database Columns
 
 Added to your model's table:
 
 | Column | Type | Default | Notes |
 |--------|------|---------|-------|
-| `failed_auth_count` | `integer` | `0` | Tracks consecutive failures |
+| `failed_auth_count` | `integer` | `0` | Tracks consecutive password failures |
 | `locked_at` | `datetime` | `nil` | When the account was locked |
+| `failed_mfa_count` | `integer` | `0` | Tracks consecutive MFA failures |
+| `mfa_locked_at` | `datetime` | `nil` | When MFA was locked |
 
 ## Security Notes
 
 - Lockout is time-based by default (30 minutes). Set `lockout_duration: nil` for permanent lockout requiring manual admin intervention.
 - The counter resets to zero on successful authentication, so legitimate users are never impacted by a single failed attempt in the past.
+- Failed attempt tracking uses atomic SQL (`UPDATE SET ... CASE WHEN`) to prevent race conditions under concurrent requests.
+- When a lockout expires, the counter resets on the next failed attempt instead of continuing from the previous value.
 - Consider showing a generic "Invalid email or password" message instead of "Account locked" to avoid revealing account existence.

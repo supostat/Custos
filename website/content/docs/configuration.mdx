@@ -16,6 +16,9 @@ Custos.configure do |config|
   config.session_expiry = 24 * 60 * 60
   config.session_renewal_interval = 60 * 60
   config.token_length = 32
+  config.token_secret = Rails.application.secret_key_base
+  config.mfa_encryption_key = Rails.application.credentials.custos_mfa_key
+  config.callback_error_strategy = :log
   config.scope_map = { user: "User", api_client: "ApiClient" }
 end
 ```
@@ -64,6 +67,48 @@ The byte length for generated tokens (session tokens, magic link tokens, API tok
 
 ```ruby
 config.token_length = 48 # 384 bits of entropy
+```
+
+### `token_secret`
+
+The HMAC secret used for generating token digests. All tokens (sessions, magic links, API tokens, remember tokens) are stored as HMAC-SHA256 digests using this secret.
+
+| | |
+|---|---|
+| **Type** | `String` |
+| **Default** | `nil` (falls back to `Rails.application.secret_key_base`) |
+
+If not set, Custos falls back to `Rails.application.secret_key_base`. It is recommended to set this explicitly in production.
+
+```ruby
+config.token_secret = Rails.application.credentials.custos_token_secret
+```
+
+### `mfa_encryption_key`
+
+The AES-256-GCM key used to encrypt MFA secrets (TOTP keys, SMS codes, backup code digests) at rest. When `nil`, MFA secrets are stored in plaintext.
+
+| | |
+|---|---|
+| **Type** | `String` or `nil` |
+| **Default** | `nil` (plaintext storage) |
+
+```ruby
+config.mfa_encryption_key = Rails.application.credentials.custos_mfa_key
+```
+
+### `callback_error_strategy`
+
+How callback errors are handled. With `:log`, errors are logged and execution continues. With `:raise`, the first error is re-raised.
+
+| | |
+|---|---|
+| **Type** | `Symbol` |
+| **Default** | `:log` |
+| **Values** | `:log`, `:raise` |
+
+```ruby
+config.callback_error_strategy = :raise  # fail loudly in development
 ```
 
 ### `scope_map`
