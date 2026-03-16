@@ -45,8 +45,8 @@ module Custos
         cipher.auth_data = ''
 
         cipher.update(encrypted) + cipher.final
-      rescue ArgumentError, OpenSSL::Cipher::CipherError
-        ciphertext
+      rescue ArgumentError, OpenSSL::Cipher::CipherError => e
+        raise Custos::DecryptionError, "MFA decryption failed: #{e.class}"
       end
 
       private

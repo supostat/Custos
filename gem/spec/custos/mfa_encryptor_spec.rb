@@ -43,8 +43,9 @@ RSpec.describe Custos::MfaEncryptor do
       expect(described_class.decrypt('old-plaintext-secret')).to eq('old-plaintext-secret')
     end
 
-    it 'returns corrupted ciphertext as-is on decryption failure' do
-      expect(described_class.decrypt('enc:not-valid-base64!!!')).to eq('enc:not-valid-base64!!!')
+    it 'raises DecryptionError on corrupted ciphertext' do
+      expect { described_class.decrypt('enc:not-valid-base64!!!') }
+        .to raise_error(Custos::DecryptionError, /MFA decryption failed/)
     end
 
     it 'handles JSON data correctly' do

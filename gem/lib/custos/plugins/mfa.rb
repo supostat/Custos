@@ -36,7 +36,10 @@ module Custos
           credential = enabled_mfa_credential('totp')
           return false unless credential
 
-          totp = ROTP::TOTP.new(credential.secret_data)
+          secret = credential.secret_data
+          return false unless secret
+
+          totp = ROTP::TOTP.new(secret)
           result = totp.verify(code.to_s, drift_behind: 30, drift_ahead: 30).present?
           fire_mfa_verification_hook(result)
           result
@@ -46,7 +49,10 @@ module Custos
           credential = custos_mfa_credentials.by_method('totp').first
           return false unless credential
 
-          totp = ROTP::TOTP.new(credential.secret_data)
+          secret = credential.secret_data
+          return false unless secret
+
+          totp = ROTP::TOTP.new(secret)
           return false unless totp.verify(code.to_s, drift_behind: 30, drift_ahead: 30)
 
           credential.update!(enabled_at: Time.current)
@@ -99,7 +105,10 @@ module Custos
           credential = enabled_mfa_credential('sms')
           return false unless credential
 
-          data = parse_json_hash(credential.secret_data)
+          raw = credential.secret_data
+          return false unless raw
+
+          data = parse_json_hash(raw)
           return false if data.empty?
           return false if Time.iso8601(data['expires_at']) < Time.current
 
@@ -128,7 +137,10 @@ module Custos
         def consume_backup_code(credential, code)
           credential.with_lock do
             digest = Custos::TokenGenerator.digest(code)
-            remaining = parse_json_array(credential.secret_data)
+            raw = credential.secret_data
+            return false unless raw
+
+            remaining = parse_json_array(raw)
             matched_index = remaining.index { |stored| Custos::TokenGenerator.secure_compare(stored, digest) }
             return false unless matched_index
 

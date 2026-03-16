@@ -34,6 +34,7 @@ module Custos
   class Error < StandardError; end
   class UnknownPluginError < Error; end
   class NotAuthenticatedError < Error; end
+  class DecryptionError < Error; end
 
   @mutex = Mutex.new
 

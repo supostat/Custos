@@ -11,6 +11,8 @@ module Custos
 
     def secret_data
       Custos::MfaEncryptor.decrypt(super)
+    rescue Custos::DecryptionError
+      nil
     end
 
     def secret_data=(value)
