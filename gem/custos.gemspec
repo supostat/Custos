@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.summary = 'Plugin-based authentication for Rails'
   spec.description = 'Modern, modular authentication for Rails applications. ' \
                      'Supports password, magic link, API tokens, MFA, and more — all as composable plugins.'
-  spec.homepage = 'https://github.com/ingvar/custos'
+  spec.homepage = 'https://github.com/supostat/Custos'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.2'
 
