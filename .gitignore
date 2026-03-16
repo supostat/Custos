@@ -1,3 +1,36 @@
+# IDE / Editor
 .claude
 .vscode
+.idea
+
+# Pipeline
 scripts
+pipeline.sh
+specs
+.pipeline-logs
+
+# Gem
+gem/*.gem
+gem/.bundle
+gem/Gemfile.lock
+gem/coverage/
+gem/pkg/
+gem/tmp/
+
+# Example app Ruby
+example/.bundle
+example/Gemfile.lock
+
+# Example app
+example/log/
+example/tmp/
+example/db/*.sqlite3
+example/storage/
+
+# Website
+website/node_modules/
+website/.next/
+website/out/
+
+# OS
+.DS_Store

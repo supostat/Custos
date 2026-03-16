@@ -1,0 +1,25 @@
+# frozen_string_literal: false
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rubocop
+      root: "gem/"
+      glob: "*.rb"
+      run: bundle exec rubocop --force-exclusion {staged_files}
+
+    - name: tsc
+      root: "website/"
+      glob: "*.{ts,tsx}"
+      run: npx tsc --noEmit
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: rspec
+      root: "gem/"
+      run: bundle exec rspec
+
+    - name: website-build
+      root: "website/"
+      run: npm run build
